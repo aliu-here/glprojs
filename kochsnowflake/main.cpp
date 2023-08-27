@@ -303,8 +303,6 @@ int main()
 			VAO.insert(VAO.end(), newobjs[0].begin(), newobjs[0].end());
 			VBO.clear();
 			VBO.insert(VBO.end(), newobjs[1].begin(), newobjs[1].end());
-			width = videomode -> width;
-			height = videomode -> height;
 		}
 
 		ourShader.use();
