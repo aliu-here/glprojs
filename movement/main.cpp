@@ -103,8 +103,8 @@ void scroll_callback(GLFWwindow* window, double xoffset, double yoffset)
     fov -= (float)yoffset;
     if (fov < 1.0f)
         fov = 1.0f;
-    if (fov > 90.0f)
-        fov = 90.0f; 
+    if (fov > 110.0f)
+        fov = 110.0f; 
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
@@ -265,7 +265,7 @@ glm::vec3 cubePositions[] = {
 
 		if (fov != origfov && currentFrame - lastScrollFrame >= 0.25f)
 		{
-			fov += (45.0f - fov) / 60;
+			fov += (origfov - fov) / 60;
 		}
 
 		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
