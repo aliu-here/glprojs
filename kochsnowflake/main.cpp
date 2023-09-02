@@ -257,6 +257,8 @@ int main()
 
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
+	std::cout << VBO << '\n';
+	std::cout << &points<< '\n';
 
 	for (int i=0; i<6; i++){
 		vaocopies.push_back(VAO);
@@ -277,7 +279,7 @@ int main()
 	}
 	glm::mat4 trans = glm::mat4(1.0f);
 
-//	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+	glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 	
 	while(!glfwWindowShouldClose(window))
 	{
@@ -292,7 +294,7 @@ int main()
 		ourShader.use();
 	
 		for (int i=0; i<6; i++){
-			trans = glm::rotate(trans, glm::radians(60.0f), glm::vec3(0.0, 0.0, 1.0));
+			trans = glm::rotate(trans, glm::radians(0.0f), glm::vec3(0.0, 0.0, 1.0));
 			unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
 			glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
 			glBindVertexArray(vaocopies[i]);
