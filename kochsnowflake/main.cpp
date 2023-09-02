@@ -223,7 +223,7 @@ int main()
 	std::cerr << "before create objects\n";
 	vector<float> points = createObjs(edge, 3);
 	//unchanged copy for updating the objects
-	vector<float> pointscopy = points;
+//	vector<float> pointscopy = points;
 
 	std::cerr << "after create objects\n";
 	std::cerr << points.size() << '\n';
@@ -236,40 +236,31 @@ int main()
 	for (int i=0; i<3; i++){
 		points.push_back(0.0f);
 	}
-	for (int i=0; i<5; i++){
-		points.insert(points.end(), pointscopy.begin(), pointscopy.end());
-	}
+
 	for (int i=0; i<(int)points.size(); i++){
 		if (i%3 == 1){
 			points[i] *= aspectratio;
 		}
 	}
-	pointscopy.clear();
-	pointscopy.insert(pointscopy.end(), points.begin(), points.end());
 
-	float vertices[9];
-	int trianglenum = points.size()/9;
-	
 
-	vector<unsigned int> VAO(trianglenum), VBO(trianglenum);
+	unsigned int VAO, VBO;
 //	unsigned int VAO[trianglenum], VBO[trianglenum];
-	glGenVertexArrays(trianglenum, VAO.data());
-	glGenBuffers(trianglenum, VBO.data());
+	vector<unsigned int> vaocopies, vbocopies;
+	glGenVertexArrays(1, &VAO);
+	glGenBuffers(1, &VBO);
 
 	std::cerr << "before gen vao and vbo\n";
-	//create vaos and vbos
-	for (int i=0; i<trianglenum; i++){
-		//std::cerr << "before make the triangle\n";
-		for (int j=0; j<9; j++){
-			vertices[j] = points[i * 9 + j];
-		}
-		//std::cerr << i << "\n";
-		//std::cerr << "before binding vao and vbo\n";
-		glBindVertexArray(VAO[i]);
-		glBindBuffer(GL_ARRAY_BUFFER, VBO[i]);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(float)*9, vertices, GL_STATIC_DRAW);
-		glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
-		glEnableVertexAttribArray(0);
+	glBindVertexArray(VAO);
+	glBindBuffer(GL_ARRAY_BUFFER, VBO);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(float)*points.size(), points.data(), GL_STATIC_DRAW);
+
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
+	glEnableVertexAttribArray(0);
+
+	for (int i=0; i<6; i++){
+		vaocopies.push_back(VAO);
+		vbocopies.push_back(VBO);
 	}
 
 	std::cerr << "before shaders\n";
@@ -295,15 +286,8 @@ int main()
 		glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
 		glClear(GL_COLOR_BUFFER_BIT);
 
-		GLFWmonitor* primary = glfwGetPrimaryMonitor();
-		const GLFWvidmode* videomode = glfwGetVideoMode(primary);
-		if (videomode -> width != width || videomode -> height != height){
-			vector<vector<unsigned int>> newobjs = updateVAOs(pointscopy, videomode -> width, videomode -> height);
-			VAO.clear();
-			VAO.insert(VAO.end(), newobjs[0].begin(), newobjs[0].end());
-			VBO.clear();
-			VBO.insert(VBO.end(), newobjs[1].begin(), newobjs[1].end());
-		}
+//		GLFWmonitor* primary = glfwGetPrimaryMonitor();
+//		const GLFWvidmode* videomode = glfwGetVideoMode(primary);
 
 		ourShader.use();
 	
@@ -311,10 +295,8 @@ int main()
 			trans = glm::rotate(trans, glm::radians(60.0f), glm::vec3(0.0, 0.0, 1.0));
 			unsigned int transformLoc = glGetUniformLocation(ourShader.ID, "transform");
 			glUniformMatrix4fv(transformLoc, 1, GL_FALSE, glm::value_ptr(trans));
-			for (int i=0; i<trianglenum; i++){
-				glBindVertexArray(VAO[i]);
-				glDrawArrays(GL_TRIANGLES, 0, 3);
-			}
+			glBindVertexArray(vaocopies[i]);
+			glDrawArrays(GL_TRIANGLES, 0, points.size());
 		}
 
 		glfwSwapBuffers(window);
