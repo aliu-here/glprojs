@@ -32,9 +32,11 @@ class callback_funcs
 		float lastScrollFrame = lastFrame;
 		float lastUpToggle = lastFrame;
 		float lastMouseToggle = lastFrame;
+		float speed;
 
 		callback_funcs(	float FOV = 45.0f,
 				float zoomMax = 110.0f,
+				float moveSpeed = 10.0f,
 				float scrollSensitivity = 2.0f,
 				float mouseSensitivity = 0.1f,
 				glm::vec3 Pos = glm::vec3(0.0f, 0.0f, 3.0f),
@@ -58,6 +60,7 @@ class callback_funcs
 			mzoomMax = zoomMax;
 			mouseSens = mouseSensitivity;
 			scrollSens = scrollSensitivity;
+			speed = moveSpeed;
 		}
 
 	void init_dims(int width, int height)
@@ -73,7 +76,7 @@ class callback_funcs
 
 	void process_kb_input(GLFWwindow *window, float deltaTime, float currentTime)
 	{
-    	float cameraSpeed = static_cast<float>(1.0f * deltaTime);
+    	float cameraSpeed = static_cast<float>(speed * deltaTime);
     		if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && currentTime - lastMouseToggle >= 0.5f){
 			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 			lastMouseToggle = currentTime;

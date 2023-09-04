@@ -11,27 +11,113 @@
 #include <iostream>
 #include "include/shader.h"
 #include "process_input.cpp"
+#include <vector>
 
+using std::vector;
+
+glm::vec3 normal(vector<float> points)
+{
+	std::cout << "make vector\n";
+	glm::vec3 point1 = glm::vec3(points[0], points[1], points[2]);
+	glm::vec3 point2 = glm::vec3(points[3], points[4], points[5]);
+	glm::vec3 point3 = glm::vec3(points[6], points[7], points[8]);
+	return glm::normalize(glm::cross(point2-point1, point2-point3));
+}
+
+vector<float> slice(vector<float> in, int start, int end)
+{
+	vector<float> out;
+	for (int i=start; i<end; i++)
+	{
+		out.push_back(in[i]);
+	}
+	return out;
+}
+
+vector<float> genCube()
+{
+	vector<float> triangle;
+	vector<glm::vec3> normals;
+	vector<float> points = 	{-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+     0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 1.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+
+    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f, -0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f, -0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f, -0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f, -0.5f, -0.5f,  0.0f, 1.0f,
+
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f,
+     0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+     0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
+    -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f};
+	std::cout << points.size() << '\n';
+	vector<float> out; 
+  
+    std::cout << "before normals\n";
+    for (int i=0; i<(int)(points.size()/5)/3; i++)
+    {
+	    for (int j=0; j<15; j++)
+	    {
+		    if (j%5 <= 2){
+		    	triangle.push_back(points[i*15 + j]);
+		    }
+	    }
+	    glm::vec3 trianglenormal = normal(triangle);
+	    normals.push_back(trianglenormal);
+    }
+    std::cout << "before adding normals to the out\n";
+    for (int i=0; i<(int)(points.size()/5) / 3; i++)
+    {
+	    for (int j=0; j<3; j++)
+	    {
+		    vector<float> subvector = slice(points, i*15 + j*5, i*15 + j*5 + 5);
+		    out.insert(out.end(), subvector.begin(), subvector.end());
+//		    out.push_back(normals[i][0]);
+//		    out.push_back(normals[i][1]);
+//		    out.push_back(normals[i][2]);
+	    }
+	    std::cout << i << '\n';
+    }
+    std:: cout << out.size() << '\n';
+    return out;
+}
 
 callback_funcs camera(90.0f, 145.0f);
 
 // timing
 float deltaTime = 0.0f;	// time between current frame and last frame
 float lastFrame = 0.0f;
-float lastScrollFrame = lastFrame;
-
-//camera
-glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f,  3.0f);
-glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
-glm::vec3 cameraUD    = glm::cross(cameraFront, cameraUp);
-
 //global values for the callback functions
 float fov;
-float lastX = 1920.0f/2, lastY = 1080.0f/2;
-float pitch=0, yaw=-90.0f;
-bool firstMouse = true, mouseLocked = true;
-
 
 void framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
@@ -111,8 +197,8 @@ int main()
 
 	stbi_image_free(data);
 
-float vertices[] = {
-    -0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
+	vector<float> vertices = genCube();
+	float testpoints[180] = {-0.5f, -0.5f, -0.5f,  0.0f, 0.0f,
      0.5f, -0.5f, -0.5f,  1.0f, 0.0f,
      0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
      0.5f,  0.5f, -0.5f,  1.0f, 1.0f,
@@ -152,23 +238,17 @@ float vertices[] = {
      0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
      0.5f,  0.5f,  0.5f,  1.0f, 0.0f,
     -0.5f,  0.5f,  0.5f,  0.0f, 0.0f,
-    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f
-};
-glm::vec3 cubePositions[] = {
+    -0.5f,  0.5f, -0.5f,  0.0f, 1.0f};
+
+	for (int i=0; i<180; i++){
+		std::cout << testpoints[i] << ' ' << vertices.data()[i] << '\n';
+
+	}
+	std::cout << sizeof(testpoints) << '\n';
+
+	glm::vec3 cubePositions[] = {
     glm::vec3( 0.0f,  0.0f,  0.0f), 
-    glm::vec3( 2.0f,  5.0f, -15.0f), 
-    glm::vec3(-1.5f, -2.2f, -2.5f),  
-    glm::vec3(-3.8f, -2.0f, -12.3f),  
-    glm::vec3( 2.4f, -0.4f, -3.5f),  
-    glm::vec3(-1.7f,  3.0f, -7.5f),  
-    glm::vec3( 1.3f, -2.0f, -2.5f),  
-    glm::vec3( 1.5f,  2.0f, -2.5f), 
-    glm::vec3( 1.5f,  0.2f, -1.5f), 
-    glm::vec3(-1.3f,  1.0f, -1.5f)  
 };
-
-
-
 
 	unsigned int VAO, VBO;
 	glGenVertexArrays(1, &VAO);
@@ -177,7 +257,7 @@ glm::vec3 cubePositions[] = {
 	
 	glBindVertexArray(VAO);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
+	glBufferData(GL_ARRAY_BUFFER, vertices.size(), vertices.data(), GL_STATIC_DRAW);
 
 //	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 //	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
@@ -235,7 +315,7 @@ glm::vec3 cubePositions[] = {
 		glBindTexture(GL_TEXTURE_2D, texture);
 		glBindVertexArray(VAO);
 
-		for(unsigned int i = 0; i < 10; i++)
+		for(unsigned int i = 0; i < 2; i++)
 		{
     			glm::mat4 model = glm::mat4(1.0f);
     			model = glm::translate(model, cubePositions[i]);
