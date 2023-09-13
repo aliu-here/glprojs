@@ -1,19 +1,60 @@
+// Declaration (Header):
+
+// standard C++ header:
+#include <filesystem>
+
+// returns file path of this executable
+std::filesystem::path getExecPath();
+
+/**************************************************************************/
+
+// Definition (C++ Source):
+
+// standard C++ header:
+#include <string>
+
+// OS header:
+#ifdef _MSC_VER // Is this MSVC?
+#include <windows.h>
+#else // (not) _MSC_VER // Then it's hopefully Linux/g++.
+#include <unistd.h>
+#endif // _MSC_VER
+
+std::filesystem::path getExecPath()
+{
+#ifdef _MSC_VER // Is this MSVC?
+  std::wstring path(1024, L'\0');
+  const DWORD len
+    = GetModuleFileNameW(NULL, &path[0], (DWORD)path.size());
+  if (!len) return std::filesystem::path(); // ERROR!
+  path.resize(len);
+  return std::filesystem::path(path);
+#else // (not) _MSC_VER // Then it's hopefully Linux/g++.
+  std::string path(1024, '\0');
+  ssize_t len
+    = readlink("/proc/self/exe", &path[0], path.size());
+  if (len < 0) return std::filesystem::path(); // ERROR!
+  path.resize(len);
+  return path;
+#endif // _MSC_VER
+}
+/*************************************************************************/
 #include "include/glad/glad.h"
 #include <GLFW/glfw3.h>
-#include <cmath>
-//textures
-#define STB_IMAGE_IMPLEMENTATION
-#include <stb/stb_image.h>
 //glm
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
+#define STB_IMAGE_IMPLEMENTATION
+#include <stb/stb_image.h>
 
 #include <iostream>
 #include "include/shader.h"
 #include "process_input.cpp"
 #include "polygon_funcs.cpp"
 #include <vector>
+#include <cmath>
 
 
 //global values for the callback functions
@@ -48,6 +89,7 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
 }
 int main()
 {
+	std::string path = getExecPath();
 	glfwInit();
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
 	glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
@@ -86,7 +128,7 @@ int main()
 	//lock cursor to center
 	glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);  
 
-	int width,height, nrChannels;
+/*	int width,height, nrChannels;
 	unsigned char *data = stbi_load("resources/rubberroom.jpg", &width, &height, &nrChannels, 0);
 	std::cout << "width: " << width << " height: " << height << '\n' << " nrchannels: " << nrChannels << '\n';
 
@@ -98,17 +140,22 @@ int main()
 	glGenerateMipmap(GL_TEXTURE_2D);
 
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);*/
 //	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_NEAREST);
 //	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-	stbi_image_free(data);
+//	stbi_image_free(data);
 
 	std::cout<< "before cube data\n";
 
-	vector<float> vertices = genCube();
+	std::vector<float> vertices = genCube();
 
-glm::vec3 lightSourceLoc = glm::vec3(1.0f, 0.3f, 1.42f);
+	for (int i=1; i<=(int) vertices.size()/6; i++)
+	{
+		std::cout << vertices[i*6-3] << ' ' << vertices[i*6 - 2] << ' ' << vertices[i*6-1] << '\n';
+	}
+
+glm::vec3 lightSourceLoc = glm::vec3(-0.7f, 0.7f, 0.6f);
 
 	unsigned int cubeVAO, VBO;
 	glGenVertexArrays(1, &cubeVAO);
@@ -118,14 +165,14 @@ glm::vec3 lightSourceLoc = glm::vec3(1.0f, 0.3f, 1.42f);
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	glBufferData(GL_ARRAY_BUFFER, vertices.size()*4, vertices.data(), GL_STATIC_DRAW);
 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6*sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 
-	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
-	glEnableVertexAttribArray(1);
+/*	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+	glEnableVertexAttribArray(1);*/
 
-	glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5*sizeof(float)));
-	glEnableVertexAttribArray(2);
+	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)(3*sizeof(float)));
+	glEnableVertexAttribArray(1);
 
 	unsigned int lightVAO;
 	glGenVertexArrays(1, &lightVAO);
@@ -133,7 +180,7 @@ glm::vec3 lightSourceLoc = glm::vec3(1.0f, 0.3f, 1.42f);
 	// we only need to bind to the VBO, the container's VBO's data already contains the data.
 	glBindBuffer(GL_ARRAY_BUFFER, VBO);
 	// set the vertex attribute 
-	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), (void*)0);
 	glEnableVertexAttribArray(0);
 	//	glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, EBO);
 	//	glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(indices), indices, GL_STATIC_DRAW);
@@ -151,7 +198,8 @@ glm::vec3 lightSourceLoc = glm::vec3(1.0f, 0.3f, 1.42f);
 	glfwSetMouseButtonCallback(window, mouse_button_callback);
 	glfwSetScrollCallback(window, scroll_callback); 
 
-	glEnable(GL_DEPTH_TEST);  	
+	glEnable(GL_DEPTH_TEST);
+	glEnable(GL_NORMALIZE); 
 	while(!glfwWindowShouldClose(window))
 	{
 		float currentFrame = static_cast<float>(glfwGetTime());
@@ -182,9 +230,11 @@ glm::vec3 lightSourceLoc = glm::vec3(1.0f, 0.3f, 1.42f);
 		mainShader.setMat4("model", model);
 		mainShader.setMat4("view", view);
 		mainShader.setFloat("ratio", 1.0f);
+		mainShader.setVec3("lightPos", lightSourceLoc);
+		mainShader.setVec3("lightDir", camera.cameraPos);
 
-		glEnable(GL_TEXTURE_2D);
-		glBindTexture(GL_TEXTURE_2D, texture);
+//		glEnable(GL_TEXTURE_2D);
+//		glBindTexture(GL_TEXTURE_2D, texture);
 
 		mainShader.setVec3("objectColor", glm::vec3(1.0f, 0.5f, 0.31f));
 		mainShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
@@ -200,6 +250,11 @@ glm::vec3 lightSourceLoc = glm::vec3(1.0f, 0.3f, 1.42f);
 		lightCubeShader.setMat4("projection", projection);
 		lightCubeShader.setMat4("view", view);
 		glDrawArrays(GL_TRIANGLES, 0, 36);
+
+		lightSourceLoc.x += glm::radians(glm::sin(currentFrame)) * 3;
+		lightSourceLoc.y += glm::radians(glm::cos(currentFrame)) * 3;
+		lightSourceLoc.z += glm::radians(glm::sin(glm::cos(currentFrame))) * 3;
+//		camera.cameraPos = lightSourceLoc;
 
 		glfwSwapBuffers(window);
 		glfwPollEvents();

@@ -1,5 +1,6 @@
 flags = -Wall -O0
 lflags = -lglfw -lGL -lX11 -lpthread -lXrandr -lXi -ldl 
+
 cc = g++
 
 debug:
@@ -14,5 +15,4 @@ test:
 	./build/main
 
 clean:
-	rm -r build
-	mkdir build
+	rm build/main 
