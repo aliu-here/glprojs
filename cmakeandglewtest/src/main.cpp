@@ -41,7 +41,6 @@ std::filesystem::path getExecPath()
 }*/
 /*************************************************************************/
 #include <GL/glew.h>
-#include <GL/glut.h>
 #include <GLFW/glfw3.h>
 //glm
 #include <glm/glm.hpp>
@@ -52,7 +51,7 @@ std::filesystem::path getExecPath()
 #include <stb/stb_image.h>
 
 #include <iostream>
-#include "include/shader.h"
+#include "shader.h"
 #include "process_input.cpp"
 #include "polygon_funcs.cpp"
 #include <vector>
