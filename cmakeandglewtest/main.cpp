@@ -40,7 +40,8 @@ std::filesystem::path getExecPath()
 #endif // _MSC_VER
 }*/
 /*************************************************************************/
-#include "include/glad/glad.h"
+#include <GL/glew.h>
+#include <GL/glut.h>
 #include <GLFW/glfw3.h>
 //glm
 #include <glm/glm.hpp>
@@ -116,9 +117,12 @@ int main()
 	}
 	glfwMakeContextCurrent(window);
 
-	if (!gladLoadGLLoader((GLADloadproc)glfwGetProcAddress))
+	glewExperimental = GL_TRUE; 
+	GLenum err = glewInit();
+	if (GLEW_OK != err)
 	{
-		std::cout << "Failed to initialize GLAD" << std::endl;
+		std::cout << "Failed to load OpenGL extensions" << std::endl;
+		glfwTerminate();
 		return -1;
 	}
 
