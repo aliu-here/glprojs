@@ -1,3 +1,5 @@
+//entirely copy-pasted from learnopengl.com
+
 #ifndef SHADER_H
 #define SHADER_H
 

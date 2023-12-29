@@ -1,45 +1,6 @@
 
 // Declaration (Header):
 
-// standard C++ header:
-//#include <filesystem>
-
-// returns file path of this executable
-//std::filesystem::path getExecPath();
-
-/**************************************************************************/
-/*
-// Definition (C++ Source):
-
-// standard C++ header:
-#include <string>
-
-// OS header:
-#ifdef _MSC_VER // Is this MSVC?
-#include <windows.h>
-#else // (not) _MSC_VER // Then it's hopefully Linux/g++.
-#include <unistd.h>
-#endif // _MSC_VER
-
-std::filesystem::path getExecPath()
-{
-#ifdef _MSC_VER // Is this MSVC?
-  std::wstring path(1024, L'\0');
-  const DWORD len
-    = GetModuleFileNameW(NULL, &path[0], (DWORD)path.size());
-  if (!len) return std::filesystem::path(); // ERROR!
-  path.resize(len);
-  return std::filesystem::path(path);
-#else // (not) _MSC_VER // Then it's hopefully Linux/g++.
-  std::string path(1024, '\0');
-  ssize_t len
-    = readlink("/proc/self/exe", &path[0], path.size());
-  if (len < 0) return std::filesystem::path(); // ERROR!
-  path.resize(len);
-  return path;
-#endif // _MSC_VER
-}*/
-/*************************************************************************/
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 //glm

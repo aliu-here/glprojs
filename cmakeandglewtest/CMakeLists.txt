@@ -14,3 +14,11 @@ ADD_EXECUTABLE(opengltesting ${SOURCE_FILES})
 target_link_libraries(opengltesting -lglfw)
 target_link_libraries(opengltesting -lGL)
 target_link_libraries(opengltesting -lGLEW)
+
+#build types
+if (NOT CMAKE_BUILD_TYPE)
+	set (CMAKE_BUILD_TYPE Release)
+endif()
+
+set(CMAKE_CXX_FLAGS "-Wall")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3")
