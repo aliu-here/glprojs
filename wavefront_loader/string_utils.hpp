@@ -1,9 +1,10 @@
+#ifndef STRING_UTILS_HPP
+#define STRING_UTILS_HPP
+
 #include <vector>
 #include <string>
 #include <cstring>
 
-#ifndef BASIC_STRING_OPS
-#define BASIC_STRING_OPS
 //stolen from stackoverflow
 std::vector<std::string> split(const std::string& s, const std::string& delimiter);
 

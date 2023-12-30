@@ -1,7 +1,7 @@
-#include "mesh.hpp"
+#ifndef LOADER_HPP
+#define LOADER_HPP
 
-#ifndef OBJ_LOADER
-#define OBJ_LOADER
+#include "mesh.hpp"
 
 namespace loader
 {

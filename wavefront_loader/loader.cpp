@@ -128,15 +128,18 @@ namespace loader
 					case 1:
 						include_tex_data = false;
 						include_normal_data = false;
+						break;
 					case 2:
 						include_tex_data = true;
 						include_normal_data = false;
+						break;
 					case 3:
 						if (locs[1] == 0)
 							include_tex_data = false;
 						else 
 							include_tex_data = true;
 						include_normal_data = true;
+						break;
 				}
 //				std::cout << "adding uvs\n";
 				if (include_tex_data) {
