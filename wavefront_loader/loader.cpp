@@ -195,7 +195,7 @@ namespace loader
 				float arg1=FLT_INF, arg2=FLT_INF, arg3=FLT_INF;
 				line_stream = std::stringstream(line);
 				line_stream >> line_type >> str_arg1 >> str_arg2 >> str_arg3;
-				std::cout << line_type << ' ' << str_arg1 << ' ' << str_arg2 << ' ' << str_arg3 << '\n';
+//				std::cout << line_type << ' ' << str_arg1 << ' ' << str_arg2 << ' ' << str_arg3 << '\n';
 				try{ 
 					arg1 = std::stof(str_arg1);
 				} catch (std::invalid_argument) {}
@@ -258,7 +258,7 @@ namespace loader
 					return {};
 				}
 				if (check3rd && arg3 == FLT_INF) {
-					std::cout << "Error in file at line " << line_num << "\n";
+					std::cerr << "Error in file at line " << line_num << "\n";
 					return {};
 				}
 			}
