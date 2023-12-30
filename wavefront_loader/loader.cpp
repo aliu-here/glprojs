@@ -18,7 +18,6 @@ namespace loader
 	{
 		std::unordered_map<std::string, material> materials;
 		std::vector<std::string> names;
-		bool check_1st=false, check_rest=false;
 		material curr_material;
 		std::ifstream mtl_file;
 		mtl_file.open(path);
@@ -27,14 +26,16 @@ namespace loader
 			std::cerr << "Failed to open material file\n";
 			return materials;
 		}
-		std::string line, curr_name;
+		std::string curr_name;
 		int line_num=0; //just to say where it went wrong
-		while (mtl_file)
+		for (std::string line; std::getline(mtl_file, line);)
 		{
-			std::getline(mtl_file, line);
+			bool check_1st=false, check_rest=false;
 			line_num++;
 			std::vector<std::string> split_line = split(line, " ");
+//			std::cout << "after split_line\n";
 			try {
+//				std::cout << split_line[0] << '\n';
 				if (split_line[0][0] == 'K') {
 					glm::vec3 curr_color = glm::vec3(std::stof(split_line[1]), std::stof(split_line[2]), std::stof(split_line[3]));
 					check_rest=true;
