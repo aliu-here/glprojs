@@ -1,5 +1,5 @@
-CC = g++
-CCFLAGS = -c -O3
+CC = clang++
+CCFLAGS = -c -O2
 
 all: loader
 	ar rcs libloader.a loader.o string_utils.o

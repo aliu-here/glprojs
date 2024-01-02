@@ -29,32 +29,46 @@ namespace loader
         {
             bool check_1st=false, check_rest=false;
             line_num++;
-            std::vector<std::string> split_line = split(line, " ");
-//          std::cout << "after split_line\n";
+            std::string str_arg1, str_arg2, str_arg3, line_type;
+            float arg1, arg2, arg3;
+            std::stringstream line_stream(line);
+            line_stream >> line_type >> str_arg1 >> str_arg2 >> str_arg3;
+
+            try {arg1 = std::stof(str_arg1);}
+            catch (std::invalid_argument) {}
+
+
+
+            try { arg1 = std::stof(str_arg1); } 
+            catch (std::invalid_argument) {}
+            try { arg2 = std::stof(str_arg2); } 
+            catch (std::invalid_argument) {}
+            try { arg3 = std::stof(str_arg3); } 
+            catch (std::invalid_argument) {}
+
             try {
-//              std::cout << split_line[0] << '\n';
-                if (split_line[0][0] == 'K') {
-                    glm::vec3 curr_color = glm::vec3(std::stof(split_line[1]), std::stof(split_line[2]), std::stof(split_line[3]));
+                if (line_type[0] == 'K') {
+                    glm::vec3 curr_color = glm::vec3(arg1, arg2, arg3);
                     check_rest=true;
-                    if (split_line[0] == "Ka")
+                    if (line_type == "Ka")
                         curr_material.ambient = curr_color;
-                    else if (split_line[0] == "Kd")
+                    else if (line_type == "Kd")
                         curr_material.diffuse = curr_color;
-                    else if (split_line[0] == "Ks")
+                    else if (line_type == "Ks")
                         curr_material.specular = curr_color;
-                } else if (split_line[0] == "Ns") {
-                    curr_material.specular_exp = std::stof(split_line[1]);
+                } else if (line_type == "Ns") {
+                    curr_material.specular_exp = arg1;
                     check_1st=true;
-                } else if (split_line[0] == "newmtl"){
+                } else if (line_type == "newmtl"){
                     if (!curr_name.empty() &&
                         materials.count(curr_name) == 0)
                         materials.insert({curr_name, curr_material});
                     material curr_material;
-                    curr_name = split_line[1];
-                } else if (split_line[0] == "map_Kd") { //hope the texture's in the same path 
+                    curr_name = str_arg1;
+                } else if (line_type == "map_Kd") { //hope the texture's in the same path 
                     std::vector<std::string> split_path = split(path, "/");
                     split_path.pop_back();
-                    split_path.push_back(split_line[1]);
+                    split_path.push_back(str_arg1);
                     curr_material.texture_path = join(split_path, "/");
                 }
             } catch (std::invalid_argument) {
@@ -62,11 +76,11 @@ namespace loader
                 return {};
             }
             bool failure=false;
-            if ((check_1st || check_rest) && std::count(split_line[1].begin(), split_line[1].end(), '.') > 1)
+            if ((check_1st || check_rest) && std::count(str_arg1.begin(), str_arg1.end(), '.') > 1)
                 failure=true;
-            if (check_rest && std::count(split_line[2].begin(), split_line[2].end(), '.') > 1)
+            if (check_rest && std::count(str_arg2.begin(), str_arg2.end(), '.') > 1)
                 failure=true;
-            if (check_rest && std::count(split_line[2].begin(), split_line[2].end(), '.') > 1)
+            if (check_rest && std::count(str_arg3.begin(), str_arg3.end(), '.') > 1)
                 failure=true;
             if (failure){
                 std::cerr << "Error in file " << path << " at line " << line_num << '\n';
@@ -109,14 +123,10 @@ namespace loader
                 if (locs.size() < 1 || locs.size() > 3 || error_detected == true)
                     std::cerr << "Error in .obj file at line " << line_num << '\n';
                 else {
-//                    std::cout << "adding vertex data\n";
                     if (locs[0] < 0)
                         locs[0] += vert_data.size(); //.obj allows negative numbers; from back
                     else 
                         locs[0] -= 1 + vertex_offset; //.obj is 1-indexed
-//                    std::cout << locs[0] << '\n';
-//                    std::cout << vert_data.size() << '\n';
-//                    std::cout << join(data, " ") << '\n';
                     for (int i=0; i<3; i++) {
                         temp.points[curr_point].point_data[i] = vert_data[locs[0]][i];
                         curr_group.bounding_box.coords[0][i] = std::max(curr_group.bounding_box.coords[0][i], vert_data[locs[0]][i]);
@@ -141,7 +151,6 @@ namespace loader
                         include_normal_data = true;
                         break;
                 }
-//                std::cout << "adding uvs\n";
                 if (include_tex_data) {
                     if (locs[1] < 0)
                         locs[1] += uv_coord_data.size();
@@ -152,17 +161,12 @@ namespace loader
                         temp.points[curr_point].point_data[i + 3] = uv_coord_data[locs[1]][i];
                     }
                 } if (include_normal_data) {
-//                    std::cout << "adding normals\n";
                     if (locs[2] < 0)
                         locs[2] += normal_data.size();
                     else 
                         locs[2] -= 1 + normal_offset;
-//                    std::cout << locs[2] << '\n';
-//                    std::cout << normal_data.size() << '\n';
-//                    std::cout << curr_point << '\n';
                     for(int i=0; i<3; i++) 
                     {
-//                        std::cout << "loop" << '\n';
                         temp.points[curr_point].point_data[i + 5] = normal_data[locs[2]][i];
                     }
                 }
@@ -185,11 +189,11 @@ namespace loader
             std::cerr << "Error opening file: " << std::strerror(errno) << '\n';
             return {};
         }
-        std::string line, line_type = "";
+        std::string line="", line_type = "";
         std::stringstream line_stream;
         int line_num = 0, face_count = 0;
         mesh empty_mesh;
-        for (line ; getline(obj_file, line);)
+        for (;getline(obj_file, line);)
         {
             bool check3rd = false, checkfloats = false;
             float arg1=FLT_INF, arg2=FLT_INF, arg3=FLT_INF;
@@ -197,15 +201,12 @@ namespace loader
             std::string str_arg1, str_arg2, str_arg3;
             line_stream >> line_type >> str_arg1 >> str_arg2 >> str_arg3;
 //            std::cout << line_type << ' ' << str_arg1 << ' ' << str_arg2 << ' ' << str_arg3 << '\n';
-            try{ 
-                arg1 = std::stof(str_arg1);
-            } catch (std::invalid_argument) {}
-            try { 
-                arg2=std::stof(str_arg2);
-            } catch (std::invalid_argument) {}
-            try {
-                arg3=std::stof(str_arg3);
-            } catch (std::invalid_argument) {}
+            try { arg1 = std::stof(str_arg1); } 
+            catch (std::invalid_argument) {}
+            try { arg2 = std::stof(str_arg2); } 
+            catch (std::invalid_argument) {}
+            try { arg3 = std::stof(str_arg3); } 
+            catch (std::invalid_argument) {}
             //stupid but i don't want to add another function to validate floats; should be okay
             if (std::count(str_arg1.begin(), str_arg1.end(), '.') > 1)
                 arg1 = FLT_INF;

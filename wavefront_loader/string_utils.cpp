@@ -20,7 +20,7 @@ std::string join(const std::vector<std::string>& array, const std::string& join_
 {
         std::string output;
         int i=0;
-        for (i; i<array.size() - 1; i++)
+        for (;i<array.size() - 1; i++)
         {
                 output.append(array[i]);
                 output.append(join_string);

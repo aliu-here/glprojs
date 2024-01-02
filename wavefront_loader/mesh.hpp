@@ -28,7 +28,7 @@ struct mesh
     std::string group_name;
     material used_mtl;
     box bounding_box;
-    std::vector<float> export_data()
+    const std::vector<float> export_data()
     {
         std::vector<float> output;
             for (triangle it: data)
