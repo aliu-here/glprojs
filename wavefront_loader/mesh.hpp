@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <string>
+#include <array>
 #include <glm/glm.hpp>
 #include <limits>
 
@@ -10,33 +11,40 @@ const float FLT_INF = std::numeric_limits<float>::infinity();
 
 namespace loader {
 
-struct point { float point_data[8]; };
+struct point 
+{
+    glm::vec3 coord = glm::vec3(0, 0, 0);
+    glm::vec2 tex = glm::vec2(0, 0);
+    glm::vec3 normal = glm::vec3(0, 0, 0);
+};
 struct box { glm::vec3 coords[2] = {glm::vec3(0, 0, 0), glm::vec3(FLT_INF, FLT_INF, FLT_INF)}; };
-struct triangle { point points[3]; };
 
 struct material
 {
     std::string texture_path, name;
-    glm::vec3 ambient, diffuse, specular;
-    float specular_exp;
+    glm::vec3 ambient = glm::vec3(0, 0, 0), diffuse=glm::vec3(0, 0, 0), specular=glm::vec3(0, 0, 0);
+    float specular_exp=0;
 };
 
 
 struct mesh
 {
-    std::vector<triangle> data;
+    std::vector<point> data;
+    std::vector<std::array<int, 3>> indices;
     std::string group_name;
     material used_mtl;
     box bounding_box;
     const std::vector<float> export_data()
     {
         std::vector<float> output;
-            for (triangle it: data)
-            {
-                for (int i=0; i<3; i++){ output.insert(output.end(), &it.points[i].point_data[0], &it.points[i].point_data[7]); }
-            }
-            return output;
+        for (point it: data)
+        {
+            output.insert(output.end(), &(it.coord[0]), &(it.coord[3]));
+            output.insert(output.end(), &(it.tex[0]), &(it.tex[3]));
+            output.insert(output.end(), &(it.normal[0]), &(it.normal[3]));
         }
+        return output;
+    }
 };
 }
 
