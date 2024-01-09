@@ -45,7 +45,15 @@ namespace loader
     std::vector<std::array<int, 3>> triangulate_poly(std::vector<point>& points, std::unordered_map<std::string, int>& indices, const std::string& line)
     {
         std::vector<std::array<int, 3>> output;
+        int prev_size = 0, curr_size = points.size();
         while (points.size() > 3){
+            if (prev_size == curr_size) {
+                std::cout << line << '\n';
+                for (point curr_point: points){
+                    print_vec3(curr_point.coord);
+                }
+                exit(1);
+            }
             for (int curr=0; curr<points.size(); curr++)
             {
                 std::array<int, 3> curr_coord;
@@ -73,6 +81,8 @@ namespace loader
                 points.erase(points.begin() + curr);
                 break;
             }
+            prev_size = curr_size;
+            curr_size = points.size();
         }
         output.push_back(wind_coords_of_triangle({points[0].coord, points[1].coord, points[2].coord},
                                                  {0, 1, 2},
@@ -272,7 +282,7 @@ namespace loader
         mesh empty_mesh;
         int curr_thread = 0;
         std::vector<std::string> threads_data[thread_num];
-        long long v_time=0, uv_time=0, vn_time=0, f_time=0, o_time=0, mtl_time=0, usemtl_time=0; 
+        int vert_count=0;
         for (;getline(obj_file, line);)
         {
             bool check3rd = false, checkfloats = false;
@@ -297,6 +307,12 @@ namespace loader
             line_num += 1;
             if (line_type == "v") { //vertex
                 vert_data.push_back(glm::vec3(arg1, arg2, arg3));
+                vert_count++;
+                if (vert_count == 516707 || vert_count == 691719 || vert_count == 691720 || vert_count == 516744) {
+                    print_vec3(vert_data[vert_data.size() - 1]);
+                    std::cout << line << '\n';
+                    std::cout << arg1 << ' ' << arg2 << ' ' << arg3 << " \n";
+                }
                 check3rd = true;
             } else if (line_type == "vt") { //uvs
                 uv_coord_data.push_back(glm::vec2(arg1, arg2));
