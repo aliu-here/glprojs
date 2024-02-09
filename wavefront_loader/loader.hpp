@@ -3,6 +3,13 @@
 
 #include "mesh.hpp"
 
+enum windings {
+    CW=false,
+    CCW=true
+};
+
+
+
 namespace loader
 {
     //loads .obj file from path, returns std::vector<mesh>; mesh is an std::vector<triangle>

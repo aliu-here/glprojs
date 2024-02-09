@@ -99,7 +99,7 @@ namespace loader
     }
     //if it fails it returns an empty vector
     //pass it an std::string specifying path and it returns meshes
-    std::vector<mesh> loader(const std::string& path, int thread_num)
+    std::vector<mesh> loader(const std::string& path, int thread_num=50)
     {
         std::vector<glm::vec3> vert_data, normal_data;
         std::vector<glm::vec2> uv_coord_data;
@@ -144,7 +144,13 @@ namespace loader
             line_num += 1;
             if (line_type == "v") { //vertex
                 vert_data.push_back(glm::vec3(arg1, arg2, arg3));
+                int v_last_idx = vert_data.size() - 1;
                 vert_count++;
+                for (int i=0; i<3; i++)
+                {
+                    curr_group.bounding_box.min[i] = std::min(curr_group.bounding_box.min[i], vert_data[v_last_idx][i]);
+                    curr_group.bounding_box.max[i] = std::max(curr_group.bounding_box.max[i], vert_data[v_last_idx][i]);
+                }
                 //39106//51322 62097//51324 74710//51325 62103//51323
                 if (vert_count == 39106 || vert_count == 62097 || vert_count == 74710 || vert_count == 51323) {
                     print_vec3(vert_data[vert_data.size() - 1]);

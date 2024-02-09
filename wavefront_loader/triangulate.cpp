@@ -12,12 +12,123 @@ enum windings {
     CCW=true
 };
 
+enum project_directions {
+    x=0,
+    y=1,
+    z=2 
+};
+
 namespace loader 
 {
+    //debugging functions
+    void print_vec3(glm::vec3 in) {
+        std::cout << "x: " << in.x << " y: " << in.y << " z: " << in.z << '\n';
+    }
+
+    void print_point(point in) {
+        std::cout << "x: " << in.coord.x << " y: " << in.coord.y << " z: " << in.coord.z << \
+            " uv_x: " << in.tex.x << " uv_y: " << in.tex.y << \
+            " normal_x: " << in.normal.x << " normal_y: " << in.normal.y << " normal_z: " << in.normal.z << '\n';
+    }
+
     //this is probably a bad idea
     std::string serialize_point(point point)
     {
         return std::string(reinterpret_cast<char*>(&point), sizeof(point));
+    }
+
+    bool present_in_float_list(std::vector<float> list, float num)
+    {
+        for (float item : list)
+            if (item == num)
+                return true;
+        return false;
+    }
+
+    bool two_or_more_match(const std::vector<point>& points, int index)
+    {
+        bool xsame, ysame, zsame, xtotal, ytotal, ztotal;
+        glm::vec3 coord = points[index].coord;
+        for (int i=0; i<points.size(); i++) {
+            if (i == index)
+                continue;
+            xsame = points[i].coord.x == coord.x;
+            ysame = points[i].coord.y == coord.y;
+            zsame = points[i].coord.z == coord.z;
+            if (xsame)
+                xtotal = xsame;
+            if (ysame)
+                ytotal = ysame;
+            if (zsame)
+                ztotal = zsame;
+        }
+        return xtotal && ytotal && ztotal;
+    }
+
+    std::vector<glm::vec2> project(const std::vector<point>& points)
+    {
+        std::vector<float> xvalues, yvalues, zvalues;
+        bool xsame = false, ysame = false, zsame = false;
+        int ignore_dir = -1;
+        for (int coord=0; coord<points.size(); coord++) {
+            bool xsame, ysame, zsame, xtotal = false, ytotal = false, ztotal = false;
+            short num=0;
+            bool first = true;
+            glm::vec3 point = points[coord].coord;
+            for (int i=0; i<points.size(); i++) {
+                short tempnum = 0;
+                if (i == coord)
+                    continue;
+                xsame = points[i].coord.x == point.x;
+                ysame = points[i].coord.y == point.y;
+                zsame = points[i].coord.z == point.z;
+                if (xsame)
+                    tempnum = tempnum | 4;
+                if (ysame)
+                    tempnum = tempnum | 2;
+                if (zsame)
+                    tempnum = tempnum | 1;
+            }
+            if (xtotal && ytotal && ztotal) {
+                print_vec3(points[coord].coord);
+                std::cout << "Either there are points that make 90 degree angles, or there is a point that is exactly the same as another one.\n";
+                return {};
+            }
+            ignore_dir = xtotal ? ignore_dir : x;
+            ignore_dir = ytotal ? ignore_dir : y;
+            ignore_dir = ztotal ? ignore_dir : z;
+        }
+        std::cout << "x: ";
+        for (float x : xvalues)
+            std::cout << x << ' ';
+        std::cout << '\n';
+        std::cout << "y: ";
+        for (float y : yvalues)
+            std::cout << y << ' ';
+        std::cout << '\n';
+        std::cout << "z: ";
+        for (float z : zvalues)
+            std::cout << z << ' ';
+        std::cout << '\n';
+        std::cout << "xsame: " << xsame << ", ysame: " << ysame << ", zsame: " << zsame << '\n';
+        print_vec3(points[points.size() - 1].coord);
+        if ((xsame + ysame + zsame) >= 2) {
+            std::cout << "Either there are points that make 90 degree angles, or there is a point that is exactly the same as another one.\n";
+            return {};
+        }
+
+        std::vector<glm::vec2> output;
+        for (point point : points){
+            glm::vec2 coord;
+            int curr_index = 0;
+            for (int i=0; i<3; i++) {
+                if (i == ignore_dir)
+                    continue;
+                curr_index++;
+                coord[curr_index] = point.coord[i];
+            }
+        }
+        return output;
     }
 
     std::array<int, 3> wind_ccw_coords_triangle(std::array<glm::vec3, 3> coords, std::array<int, 3> vertices, glm::vec3 normal, bool input_winding=CW) //you could find the winding but it's probably easier to pass it in
@@ -31,23 +142,54 @@ namespace loader
             return input_winding ? (std::array<int, 3>){vertices[0], vertices[2], vertices[1]} : (std::array<int, 3>){vertices[0], vertices[1], vertices[2]};
         return input_winding ? (std::array<int, 3>){vertices[0], vertices[1], vertices[2]} : (std::array<int, 3>){vertices[0], vertices[2], vertices[1]} ;
     }
+
     //triangulate polygon using ear clipping
-   
-    void print_vec3(glm::vec3 in) {
-        std::cout << "x: " << in.x << " y: " << in.y << " z: " << in.z << '\n';
-    }
-
-    void print_point(point in) {
-        std::cout << "x: " << in.coord.x << " y: " << in.coord.y << " z: " << in.coord.z << \
-            " uv_x: " << in.tex.x << " uv_y: " << in.tex.y << \
-            " normal_x: " << in.normal.x << " normal_y: " << in.normal.y << " normal_z: " << in.normal.z << '\n';
-    }
-
     std::vector<std::array<int, 3>> triangulate_poly(std::vector<point>& points, std::unordered_map<std::string, int>& indices, const std::string& line, bool winding=CW)
     {
         std::vector<std::array<int, 3>> output;
         int prev_size = 0, curr_size = points.size();
-        while (points.size() > 3){
+        const int points_size = points.size();
+        int next, prev;
+        std::vector<glm::vec3> crosses = {}; // cross product of first and last, compare against rest
+        int ignore_dir;
+        float mindot = FLT_INF;
+        bool first = true;
+        for (int i=0; i<points_size; i++) {
+            next = (i+1) % points_size;
+            prev = (i + points_size - 1) % points_size;
+            glm::vec3 side1, side2;
+            side1 = points[next].coord - points[i].coord;
+            side2 = points[i].coord - points[prev].coord;
+            glm::vec3 cross = glm::cross(side2, side1); // keep consistent with earlier, later then first bc non-commutative
+            std::cout << "current cross: ";
+            print_vec3(cross);
+            if (first) {
+                crosses.push_back(cross);
+                first = false;
+                continue;
+            }
+            std::cout << "first cross: ";
+            print_vec3(crosses[0]);
+            std::cout << glm::dot(glm::normalize(cross), glm::normalize(crosses[0])) << '\n';
+
+            if (fabs(glm::dot(glm::normalize(cross), glm::normalize(crosses[0]))) != 1) { // make sure all of the cross products are pointing in the same direction (or the exact opposite)
+                std::cout << "the polygon is not flat, or there are three consecutive collinear points\n";
+                return {};
+            }
+            crosses.push_back(cross);
+        }
+        float xdotprod, ydotprod, zdotprod;
+        if (crosses[0].x != 0) 
+            ignore_dir = x;
+        else if (crosses[0].y != 0) 
+            ignore_dir = y;
+        else if (crosses[0].z != 0) 
+            ignore_dir = z;
+        std::cout << "ignore_dir=" << ignore_dir << '\n';
+        for (int i=0; i<crosses.size(); i++)
+            std::cout << "cross product: " << crosses[i][ignore_dir] << ", index: " << i << '\n';
+//        while (points.size() > 3){
+            /*
             if (prev_size == curr_size) {
                 std::cout << line << '\n';
                 for (point curr_point: points){
@@ -55,8 +197,10 @@ namespace loader
                 }
                 assert(prev_size != curr_size);
             }
+            glm::vec3 firstcross = glm::normalize(glm::cross((points[1].coord - points[0].coord),(points[points.size() - 1].coord - points[0].coord)));
             for (int curr=0; curr<points.size(); curr++)
             {
+                std::cout << '\n';
                 std::array<int, 3> curr_coord;
                 int prev, next;
                 next = (curr + 1) % points.size();
@@ -64,23 +208,27 @@ namespace loader
                 if (prev == -1)
                     prev = points.size() - 1;
 
-                glm::vec3 diffa = points[next].coord - points[curr].coord; //check if collinear
-                glm::vec3 diffb = points[prev].coord - points[curr].coord;
-                glm::vec3 cross = glm::cross(diffa, diffb);
-
+                glm::vec3 line2 = points[next].coord - points[curr].coord; //check if collinear
+                glm::vec3 line1 = points[prev].coord - points[curr].coord;
+                glm::vec3 cross = glm::normalize(glm::cross(line1, line2));
+                glm::vec3 sideline = points[(next + 1) % points.size()].coord - points[next].coord;
+                glm::vec3 line3 = points[next].coord - points[prev].coord;
+                if ((cross != firstcross && cross != -firstcross)) {
+                    std::cerr << "Points on face \"" << line << "\" are not all coplanar\n";
+                    return {};
+                }
                 if (cross == glm::vec3(0, 0, 0))
                     continue;
 
-                //check if this is concave; if cross is neg compared to normals and winding is CCW or cross is pos and winding is CW 
-                float dot_cross_to_norm = glm::dot(points[curr].normal, cross);
-                if (winding ? (dot_cross_to_norm > 0.0) : (dot_cross_to_norm < 0.0)) {
-                    print_vec3(cross);
+                for (point x: points)
+                    print_point(x);
+
+                //cursed linear algebra coming ahead
+                float line2_to_sideline_angle = acos(glm::dot(line2, sideline) / (glm::length(line2) * glm::length(sideline)));
+                float line3_to_sideline_angle = acos(glm::dot(line3, sideline) / (glm::length(line3) * glm::length(sideline)));
+                float line3_to_line2_angle = acos(glm::dot(line3, line2) / (glm::length(line3) * glm::length(line2)));
+                if (line3_to_sideline_angle - line3_to_line2_angle == line2_to_sideline_angle) //this breaks in some cases but idrc
                     continue;
-                }
-                if (dot_cross_to_norm == 0) {
-                    std::cerr << "Error in file; normal is on the same plane as one of the triangles that its points forms\n";
-                    return {};
-                }
 
                 curr_coord = {indices[serialize_point(points[curr])],
                               indices[serialize_point(points[prev])],
@@ -94,10 +242,13 @@ namespace loader
             }
             prev_size = curr_size;
             curr_size = points.size();
-        }
-        output.push_back(wind_ccw_coords_triangle({points[0].coord, points[1].coord, points[2].coord},
-                                                 {0, 1, 2},
-                                                 points[0].normal));
+            */
+//        }
+//        output.push_back(wind_ccw_coords_triangle({points[0].coord, points[1].coord, points[2].coord},
+//                                                 {indices[serialize_point(points[0])],
+//                                                  indices[serialize_point(points[1])],
+//                                                  indices[serialize_point(points[2])]},
+//                                                 points[0].normal));
         return output;
     }
 

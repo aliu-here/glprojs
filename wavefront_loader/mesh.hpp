@@ -18,7 +18,7 @@ struct point
     glm::vec2 tex = glm::vec2(0, 0);
     glm::vec3 normal = glm::vec3(0, 0, 0);
 };
-struct box { glm::vec3 coords[2] = {glm::vec3(0, 0, 0), glm::vec3(FLT_INF, FLT_INF, FLT_INF)}; };
+struct box { glm::vec3 min = glm::vec3(0, 0, 0), max = glm::vec3(FLT_INF, FLT_INF, FLT_INF); };
 
 struct material
 {
@@ -51,6 +51,9 @@ struct mesh
         return output;
     }
 };
+
+typedef std::vector<mesh> model;
 }
+
 
 #endif
