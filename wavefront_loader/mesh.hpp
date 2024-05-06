@@ -25,6 +25,8 @@ struct material
     std::string texture_path, name;
     glm::vec3 ambient = glm::vec3(0, 0, 0), diffuse=glm::vec3(0, 0, 0), specular=glm::vec3(0, 0, 0);
     float specular_exp=0;
+    
+    material() {}
 };
 
 struct directed_angles
@@ -39,6 +41,9 @@ struct mesh
     std::string group_name;
     material used_mtl;
     box bounding_box;
+
+    mesh() {}
+
     const std::vector<float> export_data()
     {
         std::vector<float> output;

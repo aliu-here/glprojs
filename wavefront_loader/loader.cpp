@@ -3,13 +3,12 @@
 #include <unordered_map>
 #include <algorithm>
 #include <sstream>
-#include <limits>
-#include <chrono>
 #include <cstring>
 #include <array>
 #include <tuple>
+#include <atomic>
 #include <thread>
-#include <future>
+#include <chrono>
 
 #include "mesh.hpp"
 #include "string_utils.hpp"
@@ -67,8 +66,9 @@ namespace loader
                     if (!curr_name.empty() &&
                         materials.count(curr_name) == 0)
                         materials.insert({curr_name, curr_material});
-                    material curr_material;
+                    curr_material = material();
                     curr_name = str_arg1;
+                    curr_material.name = str_arg1;
                 } else if (line_type == "map_Kd") { //hope the texture's in the same path 
                     std::vector<std::string> split_path = split(path, "/");
                     split_path.pop_back();
@@ -97,17 +97,43 @@ namespace loader
 
         return materials;
     }
+
+    //calls the triangulation functions; packaged into a function for parallelization
+    //it's intended to be given all faces, but it works because we're going from
+    //top down in a file; so it's not going to use anything that doesn't exist yet
+    void threaded_triangulate(mesh group, const std::vector<std::string> *allfaces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, int line_num, std::atomic<unsigned int>& done_flag, std::vector<mesh>& out_groups, std::atomic<bool>& vec_used) {
+        std::tuple<std::vector<point>, std::vector<std::array<int, 3>>> processed_out = process_faces(*allfaces, coords, tex, normals, line_num);
+        group.data = std::get<0>(processed_out);
+        group.indices = std::get<1>(processed_out);
+
+        delete allfaces;
+
+        while (vec_used)
+            std::this_thread::sleep_for(std::chrono::milliseconds(1)); //dont destroy cpu usage; check every ms instead of every cycle
+        
+        vec_used.store(true);
+        out_groups.push_back(group);
+        vec_used.store(false);
+
+        done_flag.fetch_add(1);
+    }
+    
     //if it fails it returns an empty vector
     //pass it an std::string specifying path and it returns meshes
-    std::vector<mesh> loader(const std::string& path, int thread_num=50)
+    std::vector<mesh> loader(const std::string& path)
     {
+        std::atomic<bool> used = false;
+        std::atomic<unsigned int> finished = 0;
+
         std::vector<glm::vec3> vert_data, normal_data;
         std::vector<glm::vec2> uv_coord_data;
+        std::vector<std::vector<std::string>> faces_per_group;
+        std::vector<std::string> *curr_group_lines = new std::vector<std::string>; //to each their own; so the vec doesn't get overwritten when another one uses it
         std::unordered_map<std::string, material> materials;
         std::vector<mesh> groups;
+        std::vector<int> line_nums;
         mesh curr_group;
         std::ifstream obj_file;
-        int vertex_offset = 0, uv_offset = 0, normal_offset = 0; //multiple objects; say if there are 8 vertices in the first and 500 in the second, to access the last in the second, it would use f 508/../..
         obj_file.open(path);
         if (obj_file.fail()) {
             std::cerr << "Error opening file: " << std::strerror(errno) << '\n';
@@ -115,10 +141,8 @@ namespace loader
         }
         std::string line="", line_type = "";
         std::stringstream line_stream;
-        int line_num = 0, face_count = 0;
+        int line_num = 0, face_count = 0, line_num_for_triangulate = 0, ocount = 0;
         mesh empty_mesh;
-        int curr_thread = 0;
-        std::vector<std::string> threads_data[thread_num];
         int vert_count=0;
         for (;getline(obj_file, line);)
         {
@@ -141,7 +165,7 @@ namespace loader
                 arg2 = FLT_INF;
             if (std::count(str_arg3.begin(), str_arg3.end(), '.') > 1)
                 arg3 = FLT_INF;
-            line_num += 1;
+            line_num++;
             if (line_type == "v") { //vertex
                 vert_data.push_back(glm::vec3(arg1, arg2, arg3));
                 int v_last_idx = vert_data.size() - 1;
@@ -151,12 +175,6 @@ namespace loader
                     curr_group.bounding_box.min[i] = std::min(curr_group.bounding_box.min[i], vert_data[v_last_idx][i]);
                     curr_group.bounding_box.max[i] = std::max(curr_group.bounding_box.max[i], vert_data[v_last_idx][i]);
                 }
-                //39106//51322 62097//51324 74710//51325 62103//51323
-                if (vert_count == 39106 || vert_count == 62097 || vert_count == 74710 || vert_count == 51323) {
-                    print_vec3(vert_data[vert_data.size() - 1]);
-                    std::cout << line << '\n';
-                    std::cout << "\n";
-                }
                 check3rd = true;
             } else if (line_type == "vt") { //uvs
                 uv_coord_data.push_back(glm::vec2(arg1, arg2));
@@ -165,51 +183,29 @@ namespace loader
                 normal_data.push_back(glm::vec3(arg1, arg2, arg3));
                 check3rd = true;
             } else if (line_type == "f") { //face
-                face_count += 1;
-                threads_data[curr_thread].push_back(line);
-                curr_thread += 1;
-                curr_thread %= thread_num;
+                face_count++;
+                curr_group_lines->push_back(line);
             } else if (line_type == "o") { //new objects
                 if (face_count > 0) {
-                    std::future<std::tuple<std::vector<point>, std::vector<std::array<int, 3>>>> threads[thread_num];
-                    std::vector<std::tuple<std::vector<point>, std::vector<std::array<int, 3>>>> output;
-                    for (int i=0; i<thread_num; i++) {
-                        threads[i] = std::async(process_faces, std::ref(threads_data[i]), std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num, vertex_offset, uv_offset, normal_offset);
-                    }
-                    for (int i=0; i<thread_num; i++)
-                        threads[i].wait();
-                    for (int i=0; i<thread_num; i++)
-                        output.push_back(threads[i].get());
-                    int point_count = 0;
-                    std::vector<point> mesh_points;
-                    std::vector<std::array<int, 3>> point_indexes;
-                    for (auto num : output){
-                        mesh_points.insert(mesh_points.end(), std::get<0>(num).begin(), std::get<0>(num).end());
-                        for (std::array<int, 3> triangle : std::get<1>(num))
-                        {
-                            for (int i=0; i<3; i++)
-                            {
-                                triangle[i] += point_count;
-                            }
-                            point_indexes.push_back(triangle);
-                        }
-                        point_count += std::get<0>(num).size();
-                    }
-                    curr_group.data.insert(curr_group.data.end(), mesh_points.begin(), mesh_points.end());
-                    curr_group.indices.insert(curr_group.indices.end(), point_indexes.begin(), point_indexes.end());
-                    groups.push_back(curr_group);
+                    std::cout << curr_group.group_name << '\n';
+                    for (auto x : *curr_group_lines)
+                        std::cout << "loader::loader - " << x << '\n';
+
+                    std::thread temp(threaded_triangulate, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used));
+                    temp.detach();
+                    ocount++;
                 }
+
                 mesh new_mesh; //clear the current mesh
-                curr_group = new_mesh;
-                vertex_offset += vert_data.size();
-                uv_offset += uv_coord_data.size();
-                normal_offset += normal_data.size();
-                vert_data.clear(); uv_coord_data.clear(); normal_data.clear();// clear vectors
-                for (int i=0; i<thread_num; i++)
-                    threads_data[i].clear();
+                curr_group = mesh();
                 curr_group.group_name = str_arg1;
+                if (groups.size() > 0)
+                    curr_group.used_mtl = groups[groups.size() - 1].used_mtl;
                 std::cout << curr_group.group_name << '\n';
+
+                curr_group_lines = new std::vector<std::string>;
                 face_count = 0;
+                line_num_for_triangulate = line_num;
             } else if (line_type == "mtllib") { // hope you used global paths
                 std::vector<std::string> split_path = split(path, std::string("/"));
                 split_path.pop_back();
@@ -217,6 +213,27 @@ namespace loader
                 materials = load_mtl(join(split_path, "/"));
             } else if (line_type == "usemtl") {
                 if (materials.count(str_arg1) != 0) {
+                    std::cout << "material " << str_arg1 << '\n';
+                    if (curr_group.used_mtl.name.size() != 0) { //check if there's already a material defined
+                        std::cout << face_count << '\n';
+                        if (face_count > 0) {
+                            std::thread temp(threaded_triangulate, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used));
+                            temp.detach();
+                            for (auto x : *curr_group_lines)
+                                std::cout << "loader::loader - " << x << '\n';
+                            ocount++;
+                        }
+
+                        mesh new_mesh; //clear the current mesh
+                        curr_group = mesh();
+                        curr_group.used_mtl = materials[str_arg1];
+                        curr_group.group_name = str_arg1; //so its easier to debug
+                        std::cout << curr_group.group_name << '\n';
+
+                        curr_group_lines = new std::vector<std::string>; //new pointer
+                        face_count = 0;
+                        line_num_for_triangulate = line_num;
+                    }
                     curr_group.used_mtl = materials[str_arg1];
                 } else {
                     std::cerr << "Material " << str_arg1 << " was not defined\n";
@@ -233,34 +250,23 @@ namespace loader
                 return {};
             }
         }
-        std::future<std::tuple<std::vector<point>, std::vector<std::array<int, 3>>>> threads[thread_num];
-        std::vector<std::tuple<std::vector<point>, std::vector<std::array<int, 3>>>> output;
-        for (int i=0; i<thread_num; i++) {
-            threads[i] = std::async(process_faces, std::ref(threads_data[i]), std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num, vertex_offset, uv_offset, normal_offset);
+        std::cout << "face_count=" << face_count << '\n';
+        if (face_count > 0) {
+            for (auto x : *curr_group_lines)
+                std::cout << "loader::loader - " << x << '\n';
+
+            std::thread temp(threaded_triangulate, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used));
+            temp.detach();
+            ocount++;
+        } else {
+            delete curr_group_lines; //just in case, so no mem leaks
         }
-        for (int i=0; i<thread_num; i++)
-            threads[i].wait();
-        for (int i=0; i<thread_num; i++)
-            output.push_back(threads[i].get());
-        int point_count = 0;
-        std::vector<point> mesh_points;
-        std::vector<std::array<int, 3>> point_indexes;
-        for (auto num : output){
-            mesh_points.insert(mesh_points.end(), std::get<0>(num).begin(), std::get<0>(num).end());
-            for (std::array<int, 3> triangle : std::get<1>(num))
-            {
-                for (int i=0; i<3; i++)
-                {
-                    triangle[i] += point_count;
-                }
-                point_indexes.push_back(triangle);
-            }
-            point_count += std::get<0>(num).size();
-        }
-        curr_group.data.insert(curr_group.data.end(), mesh_points.begin(), mesh_points.end());
-       curr_group.indices.insert(curr_group.indices.end(), point_indexes.begin(), point_indexes.end());
-        groups.push_back(curr_group);
-        vert_data.clear(); uv_coord_data.clear(); normal_data.clear();
+        
+        std::cout << "ocount=" << ocount << '\n';
+
+        while (finished != ocount) 
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+
         return groups;
     }
 }
