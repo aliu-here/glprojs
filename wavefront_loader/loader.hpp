@@ -13,6 +13,6 @@ enum windings {
 namespace loader
 {
     //loads .obj file from path, returns std::vector<mesh>; mesh is an std::vector<triangle>
-    std::vector<mesh> loader(const std::string& path);
+    std::vector<mesh> loader(const std::string& path, bool usemt=true);
 }
 #endif

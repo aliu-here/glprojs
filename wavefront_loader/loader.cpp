@@ -120,7 +120,7 @@ namespace loader
     
     //if it fails it returns an empty vector
     //pass it an std::string specifying path and it returns meshes
-    std::vector<mesh> loader(const std::string& path)
+    std::vector<mesh> loader(const std::string& path, bool usemt=true)
     {
         std::atomic<bool> used = false;
         std::atomic<unsigned int> finished = 0;
@@ -191,10 +191,19 @@ namespace loader
                     for (auto x : *curr_group_lines)
                         std::cout << "loader::loader - " << x << '\n';
 
-                    std::thread temp(threaded_triangulate, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used));
-                    temp.detach();
-                    ocount++;
+                    if (usemt) {
+                        std::thread temp(threaded_triangulate, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used));
+                        temp.detach();
+                        ocount++;
+                    } else {
+                        auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data, line_num_for_triangulate);
+                        curr_group.data = std::get<0>(temp);
+                        curr_group.indices = std::get<1>(temp);
+                        groups.push_back(curr_group);
+                    }
                 }
+                if (!usemt || face_count <= 0)
+                    delete curr_group_lines;
 
                 mesh new_mesh; //clear the current mesh
                 curr_group = mesh();
@@ -217,11 +226,20 @@ namespace loader
                     if (curr_group.used_mtl.name.size() != 0) { //check if there's already a material defined
                         std::cout << face_count << '\n';
                         if (face_count > 0) {
-                            std::thread temp(threaded_triangulate, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used));
-                            temp.detach();
                             for (auto x : *curr_group_lines)
                                 std::cout << "loader::loader - " << x << '\n';
-                            ocount++;
+                            if (usemt) {
+                                std::thread temp(threaded_triangulate, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used));
+                                temp.detach();
+                                ocount++;
+                            } else {
+                                auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data, line_num_for_triangulate);
+                                curr_group.data = std::get<0>(temp);
+                                curr_group.indices = std::get<1>(temp);
+                                groups.push_back(curr_group);
+                            }
+                            if (!usemt || face_count <= 0)
+                                delete curr_group_lines;
                         }
 
                         mesh new_mesh; //clear the current mesh
@@ -255,17 +273,25 @@ namespace loader
             for (auto x : *curr_group_lines)
                 std::cout << "loader::loader - " << x << '\n';
 
-            std::thread temp(threaded_triangulate, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used));
-            temp.detach();
-            ocount++;
-        } else {
-            delete curr_group_lines; //just in case, so no mem leaks
+            if (usemt) {
+                std::thread temp(threaded_triangulate, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used));
+                temp.detach();
+                ocount++;
+            } else {
+                auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data, line_num_for_triangulate);
+                curr_group.data = std::get<0>(temp);
+                curr_group.indices = std::get<1>(temp);
+                groups.push_back(curr_group);
+            }
         }
-        
+        if (!usemt || face_count <= 0)
+            delete curr_group_lines;
         std::cout << "ocount=" << ocount << '\n';
 
-        while (finished != ocount) 
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        if (usemt) {
+            while (finished != ocount) 
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+        }
 
         return groups;
     }
