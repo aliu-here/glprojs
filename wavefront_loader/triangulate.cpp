@@ -5,8 +5,6 @@
 #include <unordered_map>
 #include <iostream>
 
-#include <iomanip> //for testing floats
-
 #include "mesh.hpp"
 #include "string_utils.hpp"
 
@@ -72,12 +70,13 @@ namespace loader
         glm::vec3 normalized_first = glm::normalize(crosses[0]), normalized_curr;
         std::vector<double> angles;
 
+#ifdef DEBUG
         //calculate the first angle
         std::cout << "side1: ";
         print_vec3(side1);
         std::cout << "side2: ";
         print_vec3(side2);
-
+#endif
 
         if (crosses[0].x != 0) 
             ignore_dir = x;
@@ -95,6 +94,7 @@ namespace loader
             side2 = points[i].coord - points[prev].coord;
             glm::vec3 cross = glm::cross(side2, side1); // keep consistent with earlier, later then first bc non-commutative
             normalized_curr = glm::normalize(cross);
+#ifdef DEBUG
             std::cout << "current normalized cross: ";
             print_vec3(normalized_curr);
             std::cout << "first normalized cross: ";
@@ -103,16 +103,19 @@ namespace loader
             print_vec3(glm::normalize(side1));
             std::cout << "normalized side2: ";
             print_vec3(glm::normalize(side2));
+#endif
 
             if ((normalized_curr != normalized_first) && ((-normalized_curr) != normalized_first)) { // make sure all of the cross products are pointing in the same direction (or the exact opposite)
-                std::cout << "the polygon is not flat, or there are three consecutive collinear points\n";
+                std::cerr << "the polygon is not flat, or there are three consecutive collinear points\n";
                 return {};
             }
 
             crosses.push_back(cross);
 
             double angle = std::acos(glm::dot(side1, -side2) / (glm::length(side1) * glm::length(side2)));
+#ifdef DEBUG
             std::cout << "angle: " << angle << ", index: " << i << '\n';
+#endif
             if (std::signbit(crosses[i][ignore_dir]) && winding == CW || ~std::signbit(crosses[i][ignore_dir]) && winding == CCW)
                 angle = (2*M_PI) - angle;
             angles.push_back(angle);
@@ -132,6 +135,8 @@ namespace loader
         bool reverse = std::fabs(regularsum - (points_size - 2) * M_PI) > 0.00001f; //tolerate anything within that amount of error because float
 
         std::vector<float> crosses_from_2d;
+
+#ifdef DEBUG
         std::cout << "ignore_dir=" << ignore_dir << '\n';
 
         for (int i=0; i<crosses.size(); i++)
@@ -141,6 +146,7 @@ namespace loader
 
         for (point x : points)
             print_point(x);
+#endif
 
 //      actual triangulation code goes here
         int prevsize = 0, currsize = points_size;
@@ -249,11 +255,12 @@ namespace loader
     {
         std::vector<std::array<int, 3>> point_indexes;
         std::vector<point> all_points;
+#ifdef DEBUG
         std::cout << "face count: " << faces.size() << '\n';
+#endif
         int points_sofar=0;
         for (std::string line : faces)
         {
-            std::cout << line << '\n';
             std::vector<point> point_listing;
             std::unordered_map<std::string, int> indices;
             int point_count = 0;
@@ -282,6 +289,8 @@ namespace loader
             point_indexes.insert(point_indexes.end(), temp.begin(), temp.end());
             line_num++;
         }
+
+#ifdef DEBUG
         for (point x : all_points)
             print_point(x);
         for (auto x : point_indexes) {
@@ -290,6 +299,7 @@ namespace loader
             }
             std::cout << '\n';
         }
+#endif
         return {all_points, point_indexes};
     }
 }

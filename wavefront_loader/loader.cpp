@@ -152,7 +152,10 @@ namespace loader
                 for (int j=0; j<3; j++)
                     std::get<1>(out)[i][j] += totalpointcount;
             group.indices.insert(group.indices.end(), std::get<1>(out).begin(), std::get<1>(out).end());
+
+#ifdef DEBUG
             std::cout << "loader::threaded_triangulate_boss - " << std::get<1>(out).size() << '\n';
+#endif
             totalpointcount = group.data.size();
         }
 
@@ -273,12 +276,12 @@ namespace loader
                 materials = load_mtl(join(split_path, "/"));
             } else if (line_type == "usemtl") {
                 if (materials.count(str_arg1) != 0) {
-                    std::cout << "material " << str_arg1 << '\n';
                     if (curr_group.used_mtl.name.size() != 0) { //check if there's already a material defined
-                        std::cout << face_count << '\n';
                         if (face_count > 0) {
+#ifdef DEBUG
                             for (auto x : *curr_group_lines)
                                 std::cout << "loader::loader - " << x << '\n';
+#endif
                             if (usemt) {
                                 std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used), thread_count);
                                 temp.detach();
@@ -297,7 +300,6 @@ namespace loader
                         curr_group = mesh();
                         curr_group.used_mtl = materials[str_arg1];
                         curr_group.group_name = str_arg1; //so its easier to debug
-                        std::cout << curr_group.group_name << '\n';
 
                         curr_group_lines = new std::vector<std::string>; //new pointer
                         face_count = 0;
@@ -319,10 +321,11 @@ namespace loader
                 return {};
             }
         }
-        std::cout << "face_count=" << face_count << '\n';
         if (face_count > 0) {
+#ifdef DEBUG
             for (auto x : *curr_group_lines)
                 std::cout << "loader::loader - " << x << '\n';
+#endif
 
             if (usemt) {
                 std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used), thread_count);
@@ -337,7 +340,9 @@ namespace loader
         }
         if (!usemt || face_count <= 0)
             delete curr_group_lines;
+#ifdef DEBUG
         std::cout << "ocount=" << ocount << '\n';
+#endif
 
         if (usemt) {
             while (finished != ocount) 
