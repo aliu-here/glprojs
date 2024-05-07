@@ -18,6 +18,13 @@ struct point
     glm::vec2 tex = glm::vec2(0, 0);
     glm::vec3 normal = glm::vec3(0, 0, 0);
 };
+
+union point_to_float
+{
+    point vec_form_data;
+    float raw_data[8];
+};
+
 struct box { glm::vec3 min = glm::vec3(0, 0, 0), max = glm::vec3(FLT_INF, FLT_INF, FLT_INF); };
 
 struct material
@@ -49,9 +56,8 @@ struct mesh
         std::vector<float> output;
         for (point it: data)
         {
-            output.insert(output.end(), &(it.coord[0]), &(it.coord[3]));
-            output.insert(output.end(), &(it.tex[0]), &(it.tex[3]));
-            output.insert(output.end(), &(it.normal[0]), &(it.normal[3]));
+            point_to_float temp = {it};
+            output.insert(output.end(), &(temp.raw_data[0]), &(temp.raw_data[7]));
         }
         return output;
     }
