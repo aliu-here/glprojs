@@ -39,7 +39,7 @@ namespace loader
     }
     
 
-    std::array<int, 3> wind_ccw_coords_triangle(std::array<glm::vec3, 3> coords, std::array<int, 3> vertices, glm::vec3 normal, bool input_winding=CW) //you could find the winding but it's probably easier to pass it in
+    std::array<unsigned int, 3> wind_ccw_coords_triangle(std::array<glm::vec3, 3> coords, std::array<unsigned int, 3> vertices, glm::vec3 normal, bool input_winding=CW) //you could find the winding but it's probably easier to pass it in
     {
         glm::vec3 side_a = coords[1] - coords[0];
         glm::vec3 side_b = coords[2] - coords[0];
@@ -47,14 +47,14 @@ namespace loader
         glm::vec3 cross = glm::cross(side_a, side_b);
         if (glm::dot(cross, normal) < 0)
             //weird manual cast
-            return input_winding ? (std::array<int, 3>){vertices[0], vertices[2], vertices[1]} : (std::array<int, 3>){vertices[0], vertices[1], vertices[2]};
-        return input_winding ? (std::array<int, 3>){vertices[0], vertices[1], vertices[2]} : (std::array<int, 3>){vertices[0], vertices[2], vertices[1]} ;
+            return input_winding ? (std::array<unsigned int, 3>){vertices[0], vertices[2], vertices[1]} : (std::array<unsigned int, 3>){vertices[0], vertices[1], vertices[2]};
+        return input_winding ? (std::array<unsigned int, 3>){vertices[0], vertices[1], vertices[2]} : (std::array<unsigned int, 3>){vertices[0], vertices[2], vertices[1]} ;
     }
 
     //triangulate polygon using ear clipping
-    std::vector<std::array<int, 3>> triangulate_poly(std::vector<point>& points, std::unordered_map<std::string, int>& indices, const std::string& line, bool winding=CW)
+    std::vector<std::array<unsigned int, 3>> triangulate_poly(std::vector<point>& points, std::unordered_map<std::string, unsigned int>& indices, const std::string& line, bool winding=CW)
     {
-        std::vector<std::array<int, 3>> output;
+        std::vector<std::array<unsigned int, 3>> output;
         int prev_size = 0, curr_size = points.size();
         const int points_size = points.size();
         int next, prev;
@@ -163,7 +163,7 @@ namespace loader
                     int prev, next;
                     prev = (points_size + i - 1) % points_size;
                     next = (i + 1) % points_size;
-                    std::array<int, 3> temp = wind_ccw_coords_triangle( {points[prev].coord,
+                    std::array<unsigned int, 3> temp = wind_ccw_coords_triangle( {points[prev].coord,
                                                                          points[i].coord,
                                                                          points[next].coord},
                                                                         {indices[serialize_point(points[prev])],
@@ -180,7 +180,7 @@ namespace loader
             prevsize = currsize;
             currsize = points.size();
         }
-        std::array<int, 3> temp = wind_ccw_coords_triangle( {points[2].coord,
+        std::array<unsigned int, 3> temp = wind_ccw_coords_triangle( {points[2].coord,
                                                              points[0].coord,
                                                              points[1].coord},
                                                             {indices[serialize_point(points[2])],
@@ -251,9 +251,9 @@ namespace loader
         return curr_point;
     }
 
-    std::tuple<std::vector<point>, std::vector<std::array<int, 3>>> process_faces(const std::vector<std::string>& faces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, int line_num)
+    std::tuple<std::vector<point>, std::vector<std::array<unsigned int, 3>>> process_faces(const std::vector<std::string>& faces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, int line_num)
     {
-        std::vector<std::array<int, 3>> point_indexes;
+        std::vector<std::array<unsigned int, 3>> point_indexes;
         std::vector<point> all_points;
 #ifdef DEBUG
         std::cout << "face count: " << faces.size() << '\n';
@@ -262,7 +262,7 @@ namespace loader
         for (std::string line : faces)
         {
             std::vector<point> point_listing;
-            std::unordered_map<std::string, int> indices;
+            std::unordered_map<std::string, unsigned int> indices;
             int point_count = 0;
             std::vector<std::string> split_face = split(line, " ");
             for (int i=1; i<split_face.size(); i++)
@@ -277,7 +277,7 @@ namespace loader
                 }
             }
             all_points.insert(all_points.end(), point_listing.begin(), point_listing.end());
-            std::vector<std::array<int, 3>> temp = triangulate_poly(point_listing, indices, line);
+            std::vector<std::array<unsigned int, 3>> temp = triangulate_poly(point_listing, indices, line);
             if (temp.size() == 0)
                 return {};
             for (int i=0; i<temp.size(); i++) {

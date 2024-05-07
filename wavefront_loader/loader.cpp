@@ -99,8 +99,8 @@ namespace loader
         return materials;
     }
 
-    void triangulate_worker(std::vector<std::string> *assignedfaces, const std::vector<glm::vec3>& verts, const std::vector<glm::vec2>& uvcoords, const std::vector<glm::vec3>& normals, int line_num, std::vector<std::tuple<std::vector<point>, std::vector<std::array<int,3>>>>& outvec, std::atomic<bool>& outvec_used, std::atomic<unsigned int>& finished) {
-        std::tuple<std::vector<point>, std::vector<std::array<int, 3>>> processed_out = process_faces(*assignedfaces, verts, uvcoords, normals, line_num);
+    void triangulate_worker(std::vector<std::string> *assignedfaces, const std::vector<glm::vec3>& verts, const std::vector<glm::vec2>& uvcoords, const std::vector<glm::vec3>& normals, int line_num, std::vector<std::tuple<std::vector<point>, std::vector<std::array<unsigned int,3>>>>& outvec, std::atomic<bool>& outvec_used, std::atomic<unsigned int>& finished) {
+        std::tuple<std::vector<point>, std::vector<std::array<unsigned int, 3>>> processed_out = process_faces(*assignedfaces, verts, uvcoords, normals, line_num);
 
         while (outvec_used)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -117,7 +117,7 @@ namespace loader
     //calls the triangulation functions; packaged into a function for parallelization
     void threaded_triangulate_boss(mesh group, std::vector<std::string> *allfaces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, int line_num, std::atomic<unsigned int>& done_flag, std::vector<mesh>& out_groups, std::atomic<bool>& vec_used, int thread_count) {
 
-        std::vector<std::tuple<std::vector<point>, std::vector<std::array<int, 3>>>> worker_output;
+        std::vector<std::tuple<std::vector<point>, std::vector<std::array<unsigned int, 3>>>> worker_output;
 
         std::atomic<unsigned int> worker_finished = 0;
         std::atomic<bool> using_outvec = false;

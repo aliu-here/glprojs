@@ -44,7 +44,7 @@ struct directed_angles
 struct mesh
 {
     std::vector<point> data;
-    std::vector<std::array<int, 3>> indices;
+    std::vector<std::array<unsigned int, 3>> indices;
     std::string group_name;
     material used_mtl;
     box bounding_box;
