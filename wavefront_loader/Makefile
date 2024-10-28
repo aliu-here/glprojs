@@ -2,7 +2,7 @@ CC = clang++
 CCFLAGS = -c -O3 #-fno-math-errno -fno-trapping-math
 DEBUGFLAGS = -c -g -O0
 
-all: string_utils triangulate loader
+all: clean string_utils triangulate loader
 	ar rcs libloader.a loader.o string_utils.o triangulate.o
 	rm *.o
 
@@ -18,7 +18,7 @@ triangulate:
 clean:
 	rm -f *.o *.a
 
-debug:
+debug: clean
 	${CC} string_utils.cpp ${DEBUGFLAGS}
 	${CC} triangulate.cpp ${DEBUGFLAGS}
 	${CC} loader.cpp ${DEBUGFLAGS}

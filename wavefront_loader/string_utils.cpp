@@ -1,4 +1,5 @@
 #include "string_utils.hpp"
+#include <algorithm>
 //stolen from stackoverflow
 std::vector<std::string> split(const std::string& s, const std::string& delimiter) 
 {
@@ -27,4 +28,11 @@ std::string join(const std::vector<std::string>& array, const std::string& join_
         }
         output.append(array[i]);
         return output;
+}
+
+std::string remove_whitespace(std::string& str)
+{
+    std::string copy = str;
+    copy.erase(std::remove_if(copy.begin(), copy.end(), ::isspace), copy.end());
+    return str;
 }

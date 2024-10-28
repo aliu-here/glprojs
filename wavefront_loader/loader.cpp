@@ -171,9 +171,10 @@ namespace loader
     
     //if it fails it returns an empty vector
     //pass it an std::string specifying path and it returns meshes
-    std::vector<mesh> loader(const std::string& path, bool usemt=false, int thread_count=0)
+    std::vector<mesh> loader(const std::string& path, bool usemt = false, int thread_count =0)
     {
-        if (thread_count == 0 && usemt)
+//        std::cout << usemt << '\n';
+        if (usemt && thread_count == 0)
             std::cerr << "loader::loader: Number of threads to use per section must be specified if multithreading is enabled\n";
 
         std::atomic<bool> used = false;
@@ -193,7 +194,7 @@ namespace loader
             std::cerr << "Error opening file: " << std::strerror(errno) << '\n';
             return {};
         }
-        std::string line="", line_type = "";
+        std::string line="";
         std::stringstream line_stream;
         int line_num = 0, face_count = 0, line_num_for_triangulate = 0, ocount = 0;
         mesh empty_mesh;
@@ -203,7 +204,7 @@ namespace loader
             bool check3rd = false, checkfloats = false;
             float arg1=FLT_INF, arg2=FLT_INF, arg3=FLT_INF;
             line_stream = std::stringstream(line);
-            std::string str_arg1, str_arg2, str_arg3;
+            std::string str_arg1, str_arg2, str_arg3, line_type;
             line_stream >> line_type >> str_arg1 >> str_arg2 >> str_arg3;
 //            std::cout << line_type << ' ' << str_arg1 << ' ' << str_arg2 << ' ' << str_arg3 << '\n';
             try { arg1 = std::stof(str_arg1); } 
@@ -221,6 +222,7 @@ namespace loader
                 arg3 = FLT_INF;
             line_num++;
             if (line_type == "v") { //vertex
+//                std::cout << "vert\n";
                 vert_data.push_back(glm::vec3(arg1, arg2, arg3));
                 int v_last_idx = vert_data.size() - 1;
                 vert_count++;
@@ -231,19 +233,22 @@ namespace loader
                 }
                 check3rd = true;
             } else if (line_type == "vt") { //uvs
+//                std::cout << "texture\n";
                 uv_coord_data.push_back(glm::vec2(arg1, arg2));
                 checkfloats = true;
             } else if (line_type == "vn") { //normals
+//                std::cout << "normal\n";
                 normal_data.push_back(glm::vec3(arg1, arg2, arg3));
                 check3rd = true;
             } else if (line_type == "f") { //face
                 face_count++;
+//                std::cout << line << '\n';
                 curr_group_lines->push_back(line);
             } else if (line_type == "o") { //new objects
                 if (face_count > 0) {
-                    std::cout << curr_group.group_name << '\n';
+//                    std::cout << curr_group.group_name << '\n';
                     for (auto x : *curr_group_lines)
-                        std::cout << "loader::loader - " << x << '\n';
+//                        std::cout << "loader::loader - " << x << '\n';
 
                     if (usemt) {
                         std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used), thread_count);
@@ -251,7 +256,7 @@ namespace loader
                         ocount++;
                     } else {
                         auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data, line_num_for_triangulate);
-                        curr_group.data = std::get<0>(temp);
+                    curr_group.data = std::get<0>(temp);
                         curr_group.indices = std::get<1>(temp);
                         groups.push_back(curr_group);
                     }
@@ -264,7 +269,7 @@ namespace loader
                 curr_group.group_name = str_arg1;
                 if (groups.size() > 0)
                     curr_group.used_mtl = groups[groups.size() - 1].used_mtl;
-                std::cout << curr_group.group_name << '\n';
+//                std::cout << curr_group.group_name << '\n';
 
                 curr_group_lines = new std::vector<std::string>;
                 face_count = 0;
@@ -311,8 +316,11 @@ namespace loader
                     return {};
                 }
             }
-            //being FLT_INF means that either std::stof failed or it had more than one decimal point
+//            std::cout << "check3rd: " << check3rd << " checkfloats: " << checkfloats << '\n';
+//            std::cout << (((arg1 == FLT_INF || arg2 == FLT_INF) && (check3rd || checkfloats))) << '\n';
+            //being FLT_INF meas that either std::stof failed or it had more than one decimal point
             if ((arg1 == FLT_INF || arg2 == FLT_INF) && (check3rd || checkfloats)) {
+//                std::cout << line << '\n';
                 std::cerr << "Error in .obj file at line " << line_num << "\n";
                 return {};
             }
@@ -337,6 +345,7 @@ namespace loader
                 curr_group.indices = std::get<1>(temp);
                 groups.push_back(curr_group);
             }
+            std::cout << "finished triangulation\n";
         }
         if (!usemt || face_count <= 0)
             delete curr_group_lines;
@@ -345,8 +354,8 @@ namespace loader
 #endif
 
         if (usemt) {
-            while (finished != ocount) 
-                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            while (finished != ocount)
+                std::this_thread::sleep_for(ms(1));
         }
 
         return groups;

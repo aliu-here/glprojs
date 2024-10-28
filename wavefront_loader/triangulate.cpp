@@ -1,9 +1,11 @@
 #include <array>
 #include <cmath>
+#include <glm/ext/vector_float2.hpp>
 #include <vector>
 #include <string>
 #include <unordered_map>
 #include <iostream>
+#include <algorithm>
 
 #include "mesh.hpp"
 #include "string_utils.hpp"
@@ -33,13 +35,17 @@ namespace loader
     }
 
     //this is probably a bad idea; this turns the point struct into a string so it can be used in an unordered_map
-    std::string serialize_point(point point)
+    std::string point_to_string(point point)
     {
         return std::string(reinterpret_cast<char*>(&point), sizeof(point));
     }
     
+    std::string vec3_to_string(glm::vec3 vec)
+    {
+        return std::string(reinterpret_cast<char*>(&vec), sizeof(vec));
+    }
 
-    std::array<unsigned int, 3> wind_ccw_coords_triangle(std::array<glm::vec3, 3> coords, std::array<unsigned int, 3> vertices, glm::vec3 normal, bool input_winding=CW) //you could find the winding but it's probably easier to pass it in
+    std::array<unsigned int, 3> wind_ccw_coords_triangle(std::array<glm::vec3, 3> coords, std::array<unsigned int, 3> vertices, glm::vec3 normal, bool input_winding=CW)
     {
         glm::vec3 side_a = coords[1] - coords[0];
         glm::vec3 side_b = coords[2] - coords[0];
@@ -47,153 +53,148 @@ namespace loader
         glm::vec3 cross = glm::cross(side_a, side_b);
         if (glm::dot(cross, normal) < 0)
             //weird manual cast
-            return input_winding ? (std::array<unsigned int, 3>){vertices[0], vertices[2], vertices[1]} : (std::array<unsigned int, 3>){vertices[0], vertices[1], vertices[2]};
-        return input_winding ? (std::array<unsigned int, 3>){vertices[0], vertices[1], vertices[2]} : (std::array<unsigned int, 3>){vertices[0], vertices[2], vertices[1]} ;
+            return input_winding ? (std::array<unsigned int, 3>){vertices[0], vertices[1], vertices[2]} : (std::array<unsigned int, 3>){vertices[0], vertices[2], vertices[1]};
+        return input_winding ? (std::array<unsigned int, 3>){vertices[0], vertices[2], vertices[1]} : (std::array<unsigned int, 3>){vertices[0], vertices[1], vertices[2]};
     }
 
-    //triangulate polygon using ear clipping
-    std::vector<std::array<unsigned int, 3>> triangulate_poly(std::vector<point>& points, std::unordered_map<std::string, unsigned int>& indices, const std::string& line, bool winding=CW)
+    glm::vec3 project_in_dir(glm::vec3 vec, int project_dir) 
     {
-        std::vector<std::array<unsigned int, 3>> output;
-        int prev_size = 0, curr_size = points.size();
-        const int points_size = points.size();
-        int next, prev;
+//        std::cout << project_dir << '\n';
+        switch (project_dir) {
+            case x:
+                return glm::vec3(0, vec[1], vec[2]);
+            case y:
+                return glm::vec3(vec[0], 0, vec[2]);
+            case z:
+                return glm::vec3(vec[0], vec[1], 0);
+            default:
+                std::cout << "error, project_dir handed to project_in_direction is not 0, 1, or 2 (x, y, or z)\n";
+                return glm::vec3(0, 0, 0);
+        }
+    }
+
+    int find_project_dir(glm::vec3 cross_product) 
+    {
+        glm::vec3 cross_prod_norm = glm::normalize(cross_product);
+        float angle_to_x_axis = cross_prod_norm[0],
+              angle_to_y_axis = cross_prod_norm[1],
+              angle_to_z_axis = cross_prod_norm[2];
+        float best_angle = 0; // we want to find angle where |angle| is closest to one
+                              // because |cos(0)| and |cos(180)| = 1
+        int project_dir = 0;
+        if (std::abs(angle_to_x_axis) > project_dir) {
+            project_dir = x;
+        } else if (std::abs(angle_to_y_axis) > project_dir) {
+            project_dir = y;
+        } else if (std::abs(angle_to_z_axis) > project_dir) {
+            project_dir = z;
+        }
+        return project_dir;
+    }
 
 
-        glm::vec3 side1, side2;
-        side1 = points[1].coord - points[0].coord;
-        side2 = points[0].coord - points[points_size-1].coord;
-        std::vector<glm::vec3> crosses = {glm::cross(side2,
-                                                     side1)}; // cross product of first and last, compare against rest
-        int ignore_dir;
-        float mindot = FLT_INF;
-        glm::vec3 normalized_first = glm::normalize(crosses[0]), normalized_curr;
-        std::vector<double> angles;
-
-#ifdef DEBUG
-        //calculate the first angle
-        std::cout << "side1: ";
-        print_vec3(side1);
-        std::cout << "side2: ";
-        print_vec3(side2);
-#endif
-
-        if (crosses[0].x != 0) 
-            ignore_dir = x;
-        else if (crosses[0].y != 0) 
-            ignore_dir = y;
-        else if (crosses[0].z != 0) 
-            ignore_dir = z;
-        std::cout << "ignore_dir: " << ignore_dir << '\n';
+    bool angle_direction_is_into_polygon(std::vector<point>& points, int center_index) 
+    {
+        glm::vec3 side_a = points[(center_index + 1) % points.size()].coord - points[center_index].coord;
+        glm::vec3 side_b = points[(center_index - 1 + points.size()) % points.size()].coord - points[center_index].coord;
+        int project_dir = find_project_dir(glm::cross(side_a, side_b));
+        glm::vec3 ray_start = project_in_dir(points[center_index].coord, project_dir),
+                  ray_dir = project_in_dir(side_a + side_b, project_dir);
         
-        for (int i=1; i<points_size; i++) {
-            std::cout << '\n';
-            next = (i+1) % points_size;
-            prev = (i + points_size - 1) % points_size;
-            side1 = points[next].coord - points[i].coord;
-            side2 = points[i].coord - points[prev].coord;
-            glm::vec3 cross = glm::cross(side2, side1); // keep consistent with earlier, later then first bc non-commutative
-            normalized_curr = glm::normalize(cross);
-#ifdef DEBUG
-            std::cout << "current normalized cross: ";
-            print_vec3(normalized_curr);
-            std::cout << "first normalized cross: ";
-            print_vec3(normalized_first);
-            std::cout << "normalized side1: ";
-            print_vec3(glm::normalize(side1));
-            std::cout << "normalized side2: ";
-            print_vec3(glm::normalize(side2));
-#endif
+        int cross_count = 0; 
 
-            if ((normalized_curr != normalized_first) && ((-normalized_curr) != normalized_first)) { // make sure all of the cross products are pointing in the same direction (or the exact opposite)
-                std::cerr << "the polygon is not flat, or there are three consecutive collinear points\n";
-                return {};
+        const float EPSILON = std::pow(2, -10);
+
+        for (int seg_start_pos=0; seg_start_pos < points.size(); seg_start_pos++) {
+            glm::vec3 seg_start = project_in_dir(points[seg_start_pos].coord, project_dir),
+                      seg_dir = project_in_dir(points[(seg_start_pos + 1) % points.size()].coord, project_dir) - seg_start;
+
+            //algorithm from page 304 of graphics gems 1; by ronald goldman
+            glm::vec3 v1_cross_v2 = glm::cross(ray_dir, seg_dir);
+            float v1_cross_v2_squared = glm::dot(v1_cross_v2, v1_cross_v2);
+
+            if (v1_cross_v2_squared == 0.0f)
+                continue; //this will happen if parallel
+
+            float t_numerator = glm::dot(glm::cross((seg_start - ray_start), seg_dir), v1_cross_v2),
+                  t_denominator = v1_cross_v2_squared,
+                  t = t_numerator / t_denominator;
+            float s_numerator = glm::dot(glm::cross((seg_start - ray_start), ray_dir), v1_cross_v2),
+                  s_denominator = v1_cross_v2_squared,
+                  s = s_numerator / s_denominator;
+
+            //check if it's actually intersecting within the bounds
+//            std::cout << "ray intersect point: ";
+//            print_vec3((ray_start + ray_dir*t));
+//            std::cout << "segment intersect point: ";
+//            print_vec3((seg_start + seg_dir*s));
+//            std::cout << "t: " << t << " s: " << s << "\n";
+            if (t <= 0) //don't count starting vertex
+                continue;
+            if (s < 0 || s >= 1) // if s > 1 then it will be outside the bounds of the side
+                continue;        // and if s = 1 then you'll be double counting corners if they intersect
+            if (glm::length((ray_start + ray_dir*t) - (seg_start + seg_dir*s)) <= EPSILON) {
+//                std::cout << "same" << '\n';
+                cross_count++;
             }
-
-            crosses.push_back(cross);
-
-            double angle = std::acos(glm::dot(side1, -side2) / (glm::length(side1) * glm::length(side2)));
-#ifdef DEBUG
-            std::cout << "angle: " << angle << ", index: " << i << '\n';
-#endif
-            if (std::signbit(crosses[i][ignore_dir]) && winding == CW || ~std::signbit(crosses[i][ignore_dir]) && winding == CCW)
-                angle = (2*M_PI) - angle;
-            angles.push_back(angle);
+            ;;
         }
-        side1 = points[1].coord - points[0].coord;
-        side2 = points[0].coord - points[points_size - 1].coord;
-        double angle = std::acos(glm::dot(side1, -side2) / (glm::length(side1) * glm::length(side2)));
-        if (std::signbit(crosses[0][ignore_dir]) && winding == CW || ~std::signbit(crosses[0][ignore_dir]) && winding == CCW)
-            angle = (2*M_PI) - angle;
-        angles.push_back(angle);
-        double regularsum=0;
-        
-        for (int i=0; i<angles.size(); i++){
-            regularsum += angles[i];
-        }
+        return (cross_count % 2);
 
-        bool reverse = std::fabs(regularsum - (points_size - 2) * M_PI) > 0.00001f; //tolerate anything within that amount of error because float
+    }
 
-        std::vector<float> crosses_from_2d;
 
-#ifdef DEBUG
-        std::cout << "ignore_dir=" << ignore_dir << '\n';
-
-        for (int i=0; i<crosses.size(); i++)
-            std::cout << "cross product: " << crosses[i][ignore_dir] << ", index: " << i << '\n';
-
-        std::cout << "reverse: " << (reverse ? "yes" : "no") << '\n';
-
-        for (point x : points)
-            print_point(x);
-#endif
-
-//      actual triangulation code goes here
-        int prevsize = 0, currsize = points_size;
+    //triangulate polygon using ear clipping, for polygons with >4 vertices (bad, should probably redo)
+    std::vector<std::array<unsigned int, 3>> triangulate_poly(std::vector<point>& points, std::unordered_map<std::string, unsigned int>& indices, bool winding=CW)
+    {
+/*        for (auto point : points) {
+            print_vec3(point.coord);
+        }*/
+        std::vector<std::array<unsigned int, 3>> out;
+        int prevsize = points.size();
+        int currsize = points.size();
         while (points.size() > 3) {
-            if (prevsize == currsize) {
-                std::cout << "points.size(): " << points.size() << '\n';
-                std::cout << "winding: " << winding << '\n';
-                assert(prevsize != currsize);
-            }
-            std::cout << '\n';
-            for (int i=0; i<crosses.size(); i++) {
-                std::cout << "adjusted cross: " << crosses[i][ignore_dir] * (reverse ? -1 : 1) << '\n';
-                if (((crosses[i][ignore_dir] * (reverse ? -1 : 1)> 0) && winding == CW) || ((crosses[i][ignore_dir] * (reverse ? -1 : 1) < 0) && winding == CCW)) {
-                    int prev, next;
-                    prev = (points_size + i - 1) % points_size;
-                    next = (i + 1) % points_size;
-                    std::array<unsigned int, 3> temp = wind_ccw_coords_triangle( {points[prev].coord,
-                                                                         points[i].coord,
-                                                                         points[next].coord},
-                                                                        {indices[serialize_point(points[prev])],
-                                                                         indices[serialize_point(points[i])],
-                                                                         indices[serialize_point(points[next])]},
-                                                                        crosses[i],
-                                                                        winding);
-                    output.push_back(temp);
-                    points.erase(points.begin() + i);
-                    crosses.erase(crosses.begin() + i);
+            for (int point_index = 0; point_index < points.size(); point_index++) {
+                int prev_index = (point_index - 1 + points.size()) % points.size(), next_index = (point_index + 1) % points.size();
+                if (angle_direction_is_into_polygon(points, point_index)) {
+                    std::array<unsigned int, 3> wound_triangle = wind_ccw_coords_triangle({points[prev_index].coord, 
+                                                                                  points[point_index].coord,
+                                                                                  points[next_index].coord},
+                                                                                 {indices[point_to_string(points[prev_index])],
+                                                                                  indices[point_to_string(points[point_index])],
+                                                                                  indices[point_to_string(points[next_index])]},
+                                                                                 points[point_index].normal,
+                                                                                 winding);
+                    out.push_back(wound_triangle);
+                    points.erase(points.begin() + point_index);
                     break;
                 }
             }
-            prevsize = currsize;
             currsize = points.size();
+            if (currsize == prevsize) {
+                std::cout << "error\n";
+                std::cout << "points: \n";
+                for (auto point : points) {
+                    print_point(point);
+                }
+                exit(1);
+            }
         }
-        std::array<unsigned int, 3> temp = wind_ccw_coords_triangle( {points[2].coord,
-                                                             points[0].coord,
-                                                             points[1].coord},
-                                                            {indices[serialize_point(points[2])],
-                                                             indices[serialize_point(points[0])],
-                                                             indices[serialize_point(points[1])]},
-                                                            crosses[0],
-                                                            winding);
-        output.push_back(temp);
-        return output;
+        std::array<unsigned int, 3> wound_triangle = wind_ccw_coords_triangle({points[0].coord, 
+                                                                               points[1].coord,
+                                                                               points[2].coord},
+                                                                              {indices[point_to_string(points[0])],
+                                                                               indices[point_to_string(points[1])],
+                                                                               indices[point_to_string(points[2])]},
+                                                                              points[1].normal,
+                                                                              winding);
+        out.push_back(wound_triangle);
+        return out;
     }
 
     point generate_point(const std::string& point_data, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, int line_num)
     {
+//        std::cout << "point_data=" << point_data << '\n';
         std::vector<std::string> split_arg = split(point_data, "/");
         bool error_detected = false, include_tex_data = false, include_normal_data = false;
         point curr_point;
@@ -265,29 +266,34 @@ namespace loader
             std::unordered_map<std::string, unsigned int> indices;
             int point_count = 0;
             std::vector<std::string> split_face = split(line, " ");
+//            std::cout << line << '\n';
             for (int i=1; i<split_face.size(); i++)
             {
                 point curr_point = generate_point(split_face[i], coords, tex, normals, line_num);
-                std::string serialized = serialize_point(curr_point);
+                std::string serialized = point_to_string(curr_point);
                 if (indices.find(serialized) == indices.end())
                 {
-                    indices.insert({serialized, point_count});
+                    indices.insert({serialized, point_count + points_sofar});
                     point_listing.push_back(curr_point);
                     point_count++;
                 }
             }
+
+            points_sofar += point_listing.size();
+
+            for (auto point : point_listing) {
+//                print_point(point);
+            }
+
             all_points.insert(all_points.end(), point_listing.begin(), point_listing.end());
-            std::vector<std::array<unsigned int, 3>> temp = triangulate_poly(point_listing, indices, line);
+            std::vector<std::array<unsigned int, 3>> temp = triangulate_poly(point_listing, indices);
             if (temp.size() == 0)
                 return {};
-            for (int i=0; i<temp.size(); i++) {
-                for (short j=0; j<3; j++) {
-                    temp[i][j] += points_sofar;
-                }
-            }
-            points_sofar += point_listing.size();
+
             point_indexes.insert(point_indexes.end(), temp.begin(), temp.end());
             line_num++;
+//            std::cout << points_sofar << ": points_sofar\n";
+//            std::cout << std::endl << '\n';
         }
 
 #ifdef DEBUG

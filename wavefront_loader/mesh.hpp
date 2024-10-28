@@ -14,9 +14,9 @@ namespace loader {
 
 struct point 
 {
-    glm::vec3 coord = glm::vec3(0, 0, 0);
-    glm::vec2 tex = glm::vec2(0, 0);
-    glm::vec3 normal = glm::vec3(0, 0, 0);
+    glm::vec3 coord = glm::vec3(0.0, 0.0, 0.0);
+    glm::vec2 tex = glm::vec2(0.0, 0.0);
+    glm::vec3 normal = glm::vec3(0.0, 0.0, 0.0);
 };
 
 union point_to_float
@@ -25,13 +25,13 @@ union point_to_float
     float raw_data[8];
 };
 
-struct box { glm::vec3 min = glm::vec3(0, 0, 0), max = glm::vec3(FLT_INF, FLT_INF, FLT_INF); };
+struct box { glm::vec3 min = glm::vec3(0, 0, 0), max = glm::vec3(0.0, 0.0, 0.0); };
 
 struct material
 {
     std::string texture_path, name;
-    glm::vec3 ambient = glm::vec3(0, 0, 0), diffuse=glm::vec3(0, 0, 0), specular=glm::vec3(0, 0, 0);
-    float specular_exp=0;
+    glm::vec3 ambient = glm::vec3(0.56, 0.56, 0.56), diffuse=glm::vec3(0.2, 0.2, 0.2), specular=glm::vec3(0.8, 0.8, 0.8); //light grey color, like blender
+    float specular_exp=0.5;
     
     material() {}
 };
@@ -51,7 +51,7 @@ struct mesh
 
     mesh() {}
 
-    const std::vector<float> export_data()
+    std::vector<float> export_data()
     {
         std::vector<float> output;
         for (point it: data)

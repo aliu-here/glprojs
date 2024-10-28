@@ -12,7 +12,10 @@ enum windings {
 
 namespace loader
 {
-    //loads .obj file from path, returns std::vector<mesh>; mesh is an std::vector<triangle>
-    std::vector<mesh> loader(const std::string& path, bool usemt=true, int threadcount=0);
+    /**
+     * Loads a .obj wavefront file, specified as an std::string which is the path to the file;
+     * there is an option to use mulithreading to triangulate the file, which is off by default
+     * */
+    std::vector<mesh> loader(const std::string& path, bool usemt=false, int threadcount=0);
 }
 #endif
