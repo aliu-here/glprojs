@@ -192,7 +192,7 @@ namespace loader
         return out;
     }
 
-    point generate_point(const std::string& point_data, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, int line_num)
+    point generate_point(const std::string& point_data, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals)
     {
 //        std::cout << "point_data=" << point_data << '\n';
         std::vector<std::string> split_arg = split(point_data, "/");
@@ -211,7 +211,7 @@ namespace loader
                 }
         }
         if (locs.size() < 1 || locs.size() > 3 || error_detected == true)
-            std::cerr << "Error in .obj file at line " << line_num << '\n';
+            std::cerr << "Error in .obj file detected\n";
         if (locs[0] < 0)
             locs[0] += coords.size(); //.obj allows negative numbers; from back
         else
@@ -252,7 +252,7 @@ namespace loader
         return curr_point;
     }
 
-    std::tuple<std::vector<point>, std::vector<std::array<unsigned int, 3>>> process_faces(const std::vector<std::string>& faces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, int line_num)
+    std::tuple<std::vector<point>, std::vector<std::array<unsigned int, 3>>> process_faces(const std::vector<std::string>& faces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals)
     {
         std::vector<std::array<unsigned int, 3>> point_indexes;
         std::vector<point> all_points;
@@ -269,7 +269,7 @@ namespace loader
 //            std::cout << line << '\n';
             for (int i=1; i<split_face.size(); i++)
             {
-                point curr_point = generate_point(split_face[i], coords, tex, normals, line_num);
+                point curr_point = generate_point(split_face[i], coords, tex, normals);
                 std::string serialized = point_to_string(curr_point);
                 if (indices.find(serialized) == indices.end())
                 {
@@ -291,7 +291,6 @@ namespace loader
                 return {};
 
             point_indexes.insert(point_indexes.end(), temp.begin(), temp.end());
-            line_num++;
 //            std::cout << points_sofar << ": points_sofar\n";
 //            std::cout << std::endl << '\n';
         }

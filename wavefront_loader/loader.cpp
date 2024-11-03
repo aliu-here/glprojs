@@ -99,8 +99,8 @@ namespace loader
         return materials;
     }
 
-    void triangulate_worker(std::vector<std::string> *assignedfaces, const std::vector<glm::vec3>& verts, const std::vector<glm::vec2>& uvcoords, const std::vector<glm::vec3>& normals, int line_num, std::vector<std::tuple<std::vector<point>, std::vector<std::array<unsigned int,3>>>>& outvec, std::atomic<bool>& outvec_used, std::atomic<unsigned int>& finished) {
-        std::tuple<std::vector<point>, std::vector<std::array<unsigned int, 3>>> processed_out = process_faces(*assignedfaces, verts, uvcoords, normals, line_num);
+    void triangulate_worker(std::vector<std::string> *assignedfaces, const std::vector<glm::vec3>& verts, const std::vector<glm::vec2>& uvcoords, const std::vector<glm::vec3>& normals, std::vector<std::tuple<std::vector<point>, std::vector<std::array<unsigned int,3>>>>& outvec, std::atomic<bool>& outvec_used, std::atomic<unsigned int>& finished) {
+        std::tuple<std::vector<point>, std::vector<std::array<unsigned int, 3>>> processed_out = process_faces(*assignedfaces, verts, uvcoords, normals);
 
         while (outvec_used)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -109,34 +109,26 @@ namespace loader
         outvec.push_back(processed_out);
         outvec_used.store(false);
 
-        delete assignedfaces;
+//        delete assignedfaces;
 
         finished.fetch_add(1);
     }
 
     //calls the triangulation functions; packaged into a function for parallelization
-    void threaded_triangulate_boss(mesh group, std::vector<std::string> *allfaces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, int line_num, std::atomic<unsigned int>& done_flag, std::vector<mesh>& out_groups, std::atomic<bool>& vec_used, int thread_count) {
+    void threaded_triangulate_boss(mesh group, std::vector<std::string> *allfaces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, std::atomic<unsigned int>& done_flag, std::vector<mesh>& out_groups, std::atomic<bool>& vec_used, int thread_count) {
 
         std::vector<std::tuple<std::vector<point>, std::vector<std::array<unsigned int, 3>>>> worker_output;
 
         std::atomic<unsigned int> worker_finished = 0;
         std::atomic<bool> using_outvec = false;
 
-        float lines_per_thread = ((float)allfaces->size() / thread_count);
-        float sum=0;
-        int counter=0;
+        std::vector<std::vector<std::string>> dist_work = std::vector<std::vector<std::string>>(thread_count);
+        for (int i=0; i<allfaces->size(); i++) {
+            dist_work[i % thread_count].push_back((*allfaces)[i]);
+        }
+//        delete allfaces;
         for (int i=0; i<thread_count; i++) {
-            std::vector<std::string> *temp;
-            int startlinenum = line_num + counter;
-            if (i == thread_count - 1) {
-                temp = new std::vector<std::string>(allfaces->begin() + counter, allfaces->end());
-            } else {
-                sum += lines_per_thread;
-                temp = new std::vector<std::string>(allfaces->begin() + counter, allfaces->begin() + counter + std::round(sum));
-                counter += std::round(sum);
-                sum -= std::round(sum);
-            }
-            std::thread worker(triangulate_worker, temp, std::ref(coords), std::ref(tex), std::ref(normals), startlinenum, std::ref(worker_output), std::ref(using_outvec), std::ref(worker_finished));
+            std::thread worker(triangulate_worker, &dist_work[i], std::ref(coords), std::ref(tex), std::ref(normals), std::ref(worker_output), std::ref(using_outvec), std::ref(worker_finished));
             worker.detach();
         }
 
@@ -249,12 +241,12 @@ namespace loader
 //                    std::cout << curr_group.group_name << '\n';
 
                     if (usemt) {
-                        std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used), thread_count);
+                        std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), std::ref(finished), std::ref(groups), std::ref(used), thread_count);
                         temp.detach();
                         ocount++;
                     } else {
-                        auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data, line_num_for_triangulate);
-                    curr_group.data = std::get<0>(temp);
+                        auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data);
+                        curr_group.data = std::get<0>(temp);
                         curr_group.indices = std::get<1>(temp);
                         groups.push_back(curr_group);
                     }
@@ -271,7 +263,6 @@ namespace loader
 
                 curr_group_lines = new std::vector<std::string>;
                 face_count = 0;
-                line_num_for_triangulate = line_num;
             } else if (line_type == "mtllib") { // hope you used global paths
                 std::vector<std::string> split_path = split(path, std::string("/"));
                 split_path.pop_back();
@@ -286,11 +277,11 @@ namespace loader
                                 std::cout << "loader::loader - " << x << '\n';
 #endif
                             if (usemt) {
-                                std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used), thread_count);
+                                std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), std::ref(finished), std::ref(groups), std::ref(used), thread_count);
                                 temp.detach();
                                 ocount++;
                             } else {
-                                auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data, line_num_for_triangulate);
+                                auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data);
                                 curr_group.data = std::get<0>(temp);
                                 curr_group.indices = std::get<1>(temp);
                                 groups.push_back(curr_group);
@@ -306,7 +297,6 @@ namespace loader
 
                         curr_group_lines = new std::vector<std::string>; //new pointer
                         face_count = 0;
-                        line_num_for_triangulate = line_num;
                     }
                     curr_group.used_mtl = materials[str_arg1];
                 } else {
@@ -334,11 +324,11 @@ namespace loader
 #endif
 
             if (usemt) {
-                std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used), thread_count);
+                std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), std::ref(finished), std::ref(groups), std::ref(used), thread_count);
                 temp.detach();
                 ocount++;
             } else {
-                auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data, line_num_for_triangulate);
+                auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data);
                 curr_group.data = std::get<0>(temp);
                 curr_group.indices = std::get<1>(temp);
                 groups.push_back(curr_group);
