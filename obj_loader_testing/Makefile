@@ -6,6 +6,8 @@ winlflags = -L include/lib-mingw-w64/glfw3.dll
 cc = clang++
 wincc = x86_64-w64-mingw32-g++
 
+currdir:
+	${cc} ${lflags} ${debugflags} main.cpp wavefront_loader/libloaderdebug.a -o build/main
 debug:
 	(cd ./wavefront_loader && make debug)
 	mkdir -p build

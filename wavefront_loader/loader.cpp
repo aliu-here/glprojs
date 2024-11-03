@@ -247,8 +247,6 @@ namespace loader
             } else if (line_type == "o") { //new objects
                 if (face_count > 0) {
 //                    std::cout << curr_group.group_name << '\n';
-                    for (auto x : *curr_group_lines)
-//                        std::cout << "loader::loader - " << x << '\n';
 
                     if (usemt) {
                         std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), line_num_for_triangulate, std::ref(finished), std::ref(groups), std::ref(used), thread_count);

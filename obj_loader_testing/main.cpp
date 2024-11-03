@@ -100,16 +100,17 @@ int main()
 	glViewport(0, 0, mode->width, mode->height);
 
     auto start = std::chrono::system_clock::now();
-    std::vector<loader::mesh> model = loader::loader("/home/aliu/concave/sphere.obj");
+    std::vector<loader::mesh> model = loader::loader("/home/aliu/monkey/monkey.obj");
     auto end = std::chrono::system_clock::now();
     auto microsecs = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << microsecs.count() << "microseconds for without parallel\n";
 
     start = std::chrono::system_clock::now();
-    loader::loader("/home/aliu/concave/sphere.obj", true, 4);
+    model =  loader::loader("/home/aliu/monkey/monkey.obj", true, 32);
     end = std::chrono::system_clock::now();
     microsecs = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << microsecs.count() << "microseconds for with parallel\n";
+
     std::cout << "done loading\n";
     std::cout << model.size() << '\n';
     glm::vec3 lightSourceLoc = model[0].bounding_box.max;

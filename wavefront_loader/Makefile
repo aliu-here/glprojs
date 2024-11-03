@@ -10,7 +10,7 @@ string_utils:
 	${CC} string_utils.cpp ${CCFLAGS}
 
 loader:
-	${CC} loader.cpp ${CCFLAGS}
+	${CC} loader.cpp -fopenmp ${CCFLAGS} 
 
 triangulate:
 	${CC} triangulate.cpp ${CCFLAGS}
