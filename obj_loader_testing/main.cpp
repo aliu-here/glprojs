@@ -106,7 +106,7 @@ int main()
     std::cout << microsecs.count() << "microseconds for without parallel\n";
 
     start = std::chrono::system_clock::now();
-    model =  loader::loader("/home/aliu/monkey/monkey.obj", true, 32);
+    model = loader::loader("/home/aliu/monkey/monkey.obj", true, 8);
     end = std::chrono::system_clock::now();
     microsecs = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
     std::cout << microsecs.count() << "microseconds for with parallel\n";
@@ -132,20 +132,6 @@ int main()
         point_count += part.data.size();
     }
 
-/*    for (int i=0; i<(int)points.size()/8; i++) {
-        print_point(*((loader::point*)&(points[i*8]))); //oh my god this is so cursed
-    }
-
-
-    std::cout << '\n';
-
-    for (int i=0; i<(int)(indices.size()/3); i++) {
-        for (int j=0; j<3; j++) {
-            std::cout << indices[i*3+j] << ' ';
-        }
-        std::cout << '\n';
-    }
-*/
     std::cout << points.size() << '\n';
     std::cout << indices.size() << '\n';
 

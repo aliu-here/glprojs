@@ -8,6 +8,8 @@ wincc = x86_64-w64-mingw32-g++
 
 currdir:
 	${cc} ${lflags} ${debugflags} main.cpp wavefront_loader/libloaderdebug.a -o build/main
+currdir_opt:
+	${cc} ${lflags} ${debugflags} main.cpp wavefront_loader/libloader.a -o build/main
 debug:
 	(cd ./wavefront_loader && make debug)
 	mkdir -p build

@@ -99,8 +99,8 @@ namespace loader
         return materials;
     }
 
-    void triangulate_worker(std::vector<std::string> *assignedfaces, const std::vector<glm::vec3>& verts, const std::vector<glm::vec2>& uvcoords, const std::vector<glm::vec3>& normals, std::vector<std::tuple<std::vector<point>, std::vector<std::array<unsigned int,3>>>>& outvec, std::atomic<bool>& outvec_used, std::atomic<unsigned int>& finished) {
-        std::tuple<std::vector<point>, std::vector<std::array<unsigned int, 3>>> processed_out = process_faces(*assignedfaces, verts, uvcoords, normals);
+    void triangulate_worker(std::vector<std::string>& assignedfaces, const std::vector<glm::vec3>& verts, const std::vector<glm::vec2>& uvcoords, const std::vector<glm::vec3>& normals, std::vector<std::tuple<std::vector<point>, std::vector<std::array<unsigned int,3>>>>& outvec, std::atomic<bool>& outvec_used, std::atomic<unsigned int>& finished) {
+        std::tuple<std::vector<point>, std::vector<std::array<unsigned int, 3>>> processed_out = process_faces(assignedfaces, verts, uvcoords, normals);
 
         while (outvec_used)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
@@ -126,28 +126,33 @@ namespace loader
         for (int i=0; i<allfaces->size(); i++) {
             dist_work[i % thread_count].push_back((*allfaces)[i]);
         }
-//        delete allfaces;
         for (int i=0; i<thread_count; i++) {
-            std::thread worker(triangulate_worker, &dist_work[i], std::ref(coords), std::ref(tex), std::ref(normals), std::ref(worker_output), std::ref(using_outvec), std::ref(worker_finished));
+//            std::cout << "created thread\n";
+            std::thread worker(triangulate_worker, std::ref(dist_work[i]), std::ref(coords), std::ref(tex), std::ref(normals), std::ref(worker_output), std::ref(using_outvec), std::ref(worker_finished));
             worker.detach();
         }
 
-        delete allfaces;
 
         while (worker_finished != thread_count)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-        int totalpointcount;
+
+        delete allfaces;
+
+        group.data.clear();
+        group.indices.clear();
+
+        int totalpointcount = 0;
         for (auto out : worker_output) {
+/*            std::cout << "adding work\n";
+            std::cout << std::get<0>(out).size() << "vertices size\n";
+            std::cout << std::get<1>(out).size() << "indices size\n";*/
             group.data.insert(group.data.end(), std::get<0>(out).begin(), std::get<0>(out).end());
             for (int i=0; i<std::get<1>(out).size(); i++)
                 for (int j=0; j<3; j++)
                     std::get<1>(out)[i][j] += totalpointcount;
             group.indices.insert(group.indices.end(), std::get<1>(out).begin(), std::get<1>(out).end());
 
-#ifdef DEBUG
-            std::cout << "loader::threaded_triangulate_boss - " << std::get<1>(out).size() << '\n';
-#endif
             totalpointcount = group.data.size();
         }
 
