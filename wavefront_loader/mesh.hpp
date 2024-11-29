@@ -6,7 +6,6 @@
 #include <array>
 #include <glm/glm.hpp>
 #include <limits>
-#include <tuple>
 
 const float FLT_INF = std::numeric_limits<float>::infinity();
 
@@ -34,11 +33,6 @@ struct material
     float specular_exp=0.5;
     
     material() {}
-};
-
-struct directed_angles
-{
-    std::tuple<float, glm::vec3> outer = {0, glm::vec3(0, 0, 0)}, inner = {0, glm::vec3(0, 0, 0)};
 };
 
 struct mesh

@@ -99,17 +99,13 @@ namespace loader
         return materials;
     }
 
-    void triangulate_worker(std::vector<std::string>& assignedfaces, const std::vector<glm::vec3>& verts, const std::vector<glm::vec2>& uvcoords, const std::vector<glm::vec3>& normals, std::vector<std::tuple<std::vector<point>, std::vector<std::array<unsigned int,3>>>>& outvec, std::atomic<bool>& outvec_used, std::atomic<unsigned int>& finished) {
-        std::tuple<std::vector<point>, std::vector<std::array<unsigned int, 3>>> processed_out = process_faces(assignedfaces, verts, uvcoords, normals);
+    void triangulate_worker(std::vector<std::string>& assignedfaces, const std::vector<glm::vec3>& verts, const std::vector<glm::vec2>& uvcoords, const std::vector<glm::vec3>& normals, std::vector<std::tuple<std::vector<point>*, std::vector<std::array<unsigned int,3>>*>*>& outvec, std::atomic<bool>& outvec_used, std::atomic<unsigned int>& finished, int id) {
+        std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>*> *processed_out = process_faces(assignedfaces, verts, uvcoords, normals);
 
         while (outvec_used)
             std::this_thread::sleep_for(std::chrono::milliseconds(1));
 
-        outvec_used.store(true);
-        outvec.push_back(processed_out);
-        outvec_used.store(false);
-
-//        delete assignedfaces;
+        outvec[id] = processed_out;
 
         finished.fetch_add(1);
     }
@@ -117,7 +113,7 @@ namespace loader
     //calls the triangulation functions; packaged into a function for parallelization
     void threaded_triangulate_boss(mesh group, std::vector<std::string> *allfaces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, std::atomic<unsigned int>& done_flag, std::vector<mesh>& out_groups, std::atomic<bool>& vec_used, int thread_count) {
 
-        std::vector<std::tuple<std::vector<point>, std::vector<std::array<unsigned int, 3>>>> worker_output;
+        std::vector<std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>*>*> worker_output(thread_count);
 
         std::atomic<unsigned int> worker_finished = 0;
         std::atomic<bool> using_outvec = false;
@@ -128,7 +124,7 @@ namespace loader
         }
         for (int i=0; i<thread_count; i++) {
 //            std::cout << "created thread\n";
-            std::thread worker(triangulate_worker, std::ref(dist_work[i]), std::ref(coords), std::ref(tex), std::ref(normals), std::ref(worker_output), std::ref(using_outvec), std::ref(worker_finished));
+            std::thread worker(triangulate_worker, std::ref(dist_work[i]), std::ref(coords), std::ref(tex), std::ref(normals), std::ref(worker_output), std::ref(using_outvec), std::ref(worker_finished), i);
             worker.detach();
         }
 
@@ -147,13 +143,17 @@ namespace loader
 /*            std::cout << "adding work\n";
             std::cout << std::get<0>(out).size() << "vertices size\n";
             std::cout << std::get<1>(out).size() << "indices size\n";*/
-            group.data.insert(group.data.end(), std::get<0>(out).begin(), std::get<0>(out).end());
-            for (int i=0; i<std::get<1>(out).size(); i++)
+            group.data.insert(group.data.end(), std::get<0>(*out)->begin(), std::get<0>(*out)->end());
+            for (int i=0; i<std::get<1>(*out)->size(); i++)
                 for (int j=0; j<3; j++)
-                    std::get<1>(out)[i][j] += totalpointcount;
-            group.indices.insert(group.indices.end(), std::get<1>(out).begin(), std::get<1>(out).end());
+                    (*std::get<1>(*out))[i][j] += totalpointcount;
+            group.indices.insert(group.indices.end(), std::get<1>(*out)->begin(), std::get<1>(*out)->end());
 
             totalpointcount = group.data.size();
+
+            delete std::get<0>(*out);
+            delete std::get<1>(*out);
+            delete out;
         }
 
         while (vec_used)
@@ -251,9 +251,13 @@ namespace loader
                         ocount++;
                     } else {
                         auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data);
-                        curr_group.data = std::get<0>(temp);
-                        curr_group.indices = std::get<1>(temp);
+                        curr_group.data = *std::get<0>(*temp);
+                        curr_group.indices = *std::get<1>(*temp);
                         groups.push_back(curr_group);
+
+                        delete std::get<0>(*temp);
+                        delete std::get<1>(*temp);
+                        delete temp;
                     }
                 }
                 if (!usemt || face_count <= 0)
@@ -287,9 +291,13 @@ namespace loader
                                 ocount++;
                             } else {
                                 auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data);
-                                curr_group.data = std::get<0>(temp);
-                                curr_group.indices = std::get<1>(temp);
+                                curr_group.data = *std::get<0>(*temp);
+                                curr_group.indices = *std::get<1>(*temp);
                                 groups.push_back(curr_group);
+
+                                delete std::get<0>(*temp);
+                                delete std::get<1>(*temp);
+                                delete temp;
                             }
                             if (!usemt || face_count <= 0)
                                 delete curr_group_lines;
@@ -334,9 +342,14 @@ namespace loader
                 ocount++;
             } else {
                 auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data);
-                curr_group.data = std::get<0>(temp);
-                curr_group.indices = std::get<1>(temp);
+                curr_group.data = *std::get<0>(*temp);
+                curr_group.indices = *std::get<1>(*temp);
                 groups.push_back(curr_group);
+
+                delete std::get<0>(*temp);
+                delete std::get<1>(*temp); //this is ass bc i have to repeat this exact segment like five times
+                                           //oh well
+                delete temp;
             }
             std::cout << "finished triangulation\n";
         }

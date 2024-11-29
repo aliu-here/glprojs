@@ -5,7 +5,6 @@
 #include <string>
 #include <unordered_map>
 #include <iostream>
-#include <algorithm>
 
 #include "mesh.hpp"
 #include "string_utils.hpp"
@@ -137,7 +136,6 @@ namespace loader
 //                std::cout << "same" << '\n';
                 cross_count++;
             }
-            ;;
         }
         return (cross_count % 2);
 
@@ -252,10 +250,10 @@ namespace loader
         return curr_point;
     }
 
-    std::tuple<std::vector<point>, std::vector<std::array<unsigned int, 3>>> process_faces(const std::vector<std::string>& faces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals)
-    {
-        std::vector<std::array<unsigned int, 3>> point_indexes;
-        std::vector<point> all_points;
+    std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>* >* process_faces(const std::vector<std::string>& faces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals)
+    { //this is extremely stupid
+        std::vector<std::array<unsigned int, 3>> *point_indexes = new std::vector<std::array<unsigned int, 3>>;
+        std::vector<point> *all_points = new std::vector<point>;
 #ifdef DEBUG
         std::cout << "face count: " << faces.size() << '\n';
 #endif
@@ -285,12 +283,12 @@ namespace loader
 //                print_point(point);
             }
 
-            all_points.insert(all_points.end(), point_listing.begin(), point_listing.end());
+            all_points->insert(all_points->end(), point_listing.begin(), point_listing.end());
             std::vector<std::array<unsigned int, 3>> temp = triangulate_poly(point_listing, indices);
             if (temp.size() == 0)
                 return {};
 
-            point_indexes.insert(point_indexes.end(), temp.begin(), temp.end());
+            point_indexes->insert(point_indexes->end(), temp.begin(), temp.end());
 //            std::cout << points_sofar << ": points_sofar\n";
 //            std::cout << std::endl << '\n';
         }
@@ -305,6 +303,9 @@ namespace loader
             std::cout << '\n';
         }
 #endif
-        return {all_points, point_indexes};
+        std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>* > *temp = new std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>* >;
+        std::get<0>(*temp) = all_points;
+        std::get<1>(*temp) = point_indexes;
+        return temp;
     }
 }
