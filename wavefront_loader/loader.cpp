@@ -177,6 +177,12 @@ namespace loader
         std::atomic<bool> used = false;
         std::atomic<unsigned int> finished = 0;
 
+        std::ifstream obj_file(path);
+        if (obj_file.fail()) {
+            std::cerr << "Error opening file: " << std::strerror(errno) << '\n';
+            return {};
+        }
+
         std::vector<glm::vec3> vert_data, normal_data;
         std::vector<glm::vec2> uv_coord_data;
         std::vector<std::vector<std::string>> faces_per_group;
@@ -185,12 +191,7 @@ namespace loader
         std::vector<mesh> groups;
         std::vector<int> line_nums;
         mesh curr_group;
-        std::ifstream obj_file;
-        obj_file.open(path);
-        if (obj_file.fail()) {
-            std::cerr << "Error opening file: " << std::strerror(errno) << '\n';
-            return {};
-        }
+
         std::string line="";
         std::stringstream line_stream;
         int line_num = 0, face_count = 0, line_num_for_triangulate = 0, ocount = 0;
@@ -255,13 +256,15 @@ namespace loader
                         curr_group.indices = *std::get<1>(*temp);
                         groups.push_back(curr_group);
 
+
+                        delete curr_group_lines;
                         delete std::get<0>(*temp);
                         delete std::get<1>(*temp);
                         delete temp;
                     }
-                }
-                if (!usemt || face_count <= 0)
+                } else {
                     delete curr_group_lines;
+                }
 
                 mesh new_mesh; //clear the current mesh
                 curr_group = mesh();
@@ -295,12 +298,13 @@ namespace loader
                                 curr_group.indices = *std::get<1>(*temp);
                                 groups.push_back(curr_group);
 
+                                delete curr_group_lines;
                                 delete std::get<0>(*temp);
                                 delete std::get<1>(*temp);
                                 delete temp;
                             }
-                            if (!usemt || face_count <= 0)
-                                delete curr_group_lines;
+                        } else {
+                            delete curr_group_lines;
                         }
 
                         mesh new_mesh; //clear the current mesh
@@ -314,7 +318,7 @@ namespace loader
                     curr_group.used_mtl = materials[str_arg1];
                 } else {
                     std::cerr << "Material " << str_arg1 << " was not defined\n";
-                    return {};
+                    goto exit_on_failure;
                 }
             }
 //            std::cout << "check3rd: " << check3rd << " checkfloats: " << checkfloats << '\n';
@@ -323,19 +327,14 @@ namespace loader
             if ((arg1 == FLT_INF || arg2 == FLT_INF) && (check3rd || checkfloats)) {
 //                std::cout << line << '\n';
                 std::cerr << "Error in .obj file at line " << line_num << "\n";
-                return {};
+                goto exit_on_failure;
             }
             if (check3rd && arg3 == FLT_INF) {
                 std::cerr << "Error in file at line " << line_num << "\n";
-                return {};
+                goto exit_on_failure;
             }
         }
         if (face_count > 0) {
-#ifdef DEBUG
-            for (auto x : *curr_group_lines)
-                std::cout << "loader::loader - " << x << '\n';
-#endif
-
             if (usemt) {
                 std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), std::ref(finished), std::ref(groups), std::ref(used), thread_count);
                 temp.detach();
@@ -351,19 +350,19 @@ namespace loader
                                            //oh well
                 delete temp;
             }
-            std::cout << "finished triangulation\n";
+//            std::cout << "finished triangulation\n";
         }
-        if (!usemt || face_count <= 0)
-            delete curr_group_lines;
-#ifdef DEBUG
-        std::cout << "ocount=" << ocount << '\n';
-#endif
-
         if (usemt) {
             while (finished != ocount)
                 std::this_thread::sleep_for(ms(1));
         }
 
+        delete curr_group_lines;
+
         return groups;
+
+        exit_on_failure:
+        delete curr_group_lines;
+        return {};
     }
 }

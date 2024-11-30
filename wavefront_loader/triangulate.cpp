@@ -149,8 +149,7 @@ namespace loader
             print_vec3(point.coord);
         }*/
         std::vector<std::array<unsigned int, 3>> out;
-        int prevsize = points.size();
-        int currsize = points.size();
+        int prevsize = points.size(), currsize;
         while (points.size() > 3) {
             for (int point_index = 0; point_index < points.size(); point_index++) {
                 int prev_index = (point_index - 1 + points.size()) % points.size(), next_index = (point_index + 1) % points.size();
@@ -258,13 +257,13 @@ namespace loader
         std::cout << "face count: " << faces.size() << '\n';
 #endif
         int points_sofar=0;
+        bool failure = false;
         for (std::string line : faces)
         {
             std::vector<point> point_listing;
             std::unordered_map<std::string, unsigned int> indices;
             int point_count = 0;
             std::vector<std::string> split_face = split(line, " ");
-//            std::cout << line << '\n';
             for (int i=1; i<split_face.size(); i++)
             {
                 point curr_point = generate_point(split_face[i], coords, tex, normals);
@@ -279,15 +278,14 @@ namespace loader
 
             points_sofar += point_listing.size();
 
-            for (auto point : point_listing) {
-//                print_point(point);
-            }
-
             all_points->insert(all_points->end(), point_listing.begin(), point_listing.end());
             std::vector<std::array<unsigned int, 3>> temp = triangulate_poly(point_listing, indices);
-            if (temp.size() == 0)
+            if (temp.size() == 0) {
+                delete all_points;
+                delete point_indexes;
                 return {};
 
+            }
             point_indexes->insert(point_indexes->end(), temp.begin(), temp.end());
 //            std::cout << points_sofar << ": points_sofar\n";
 //            std::cout << std::endl << '\n';
