@@ -5,6 +5,7 @@
 #include <string>
 #include <unordered_map>
 #include <iostream>
+#include <cstring>
 
 #include "mesh.hpp"
 #include "string_utils.hpp"
@@ -36,12 +37,12 @@ namespace loader
     //this is probably a bad idea; this turns the point struct into a string so it can be used in an unordered_map
     std::string point_to_string(point point)
     {
-        return std::string(reinterpret_cast<char*>(&point), sizeof(point));
+        return std::string((char*)&point, sizeof(point));
     }
     
     std::string vec3_to_string(glm::vec3 vec)
     {
-        return std::string(reinterpret_cast<char*>(&vec), sizeof(vec));
+        return std::string((char*)&vec, sizeof(vec));
     }
 
     std::array<unsigned int, 3> wind_ccw_coords_triangle(std::array<glm::vec3, 3> coords, std::array<unsigned int, 3> vertices, glm::vec3 normal, bool input_winding=CW)
@@ -56,19 +57,17 @@ namespace loader
         return input_winding ? (std::array<unsigned int, 3>){vertices[0], vertices[2], vertices[1]} : (std::array<unsigned int, 3>){vertices[0], vertices[1], vertices[2]};
     }
 
-    glm::vec3 project_in_dir(glm::vec3 vec, int project_dir) 
+    glm::vec2 project_in_dir(glm::vec3 vec, int project_dir) 
     {
-//        std::cout << project_dir << '\n';
         switch (project_dir) {
             case x:
-                return glm::vec3(0, vec[1], vec[2]);
+                return glm::vec2(vec[1], vec[2]);
             case y:
-                return glm::vec3(vec[0], 0, vec[2]);
+                return glm::vec2(vec[0], vec[2]);
             case z:
-                return glm::vec3(vec[0], vec[1], 0);
+                return glm::vec2(vec[0], vec[1]);
             default:
-                std::cout << "error, project_dir handed to project_in_direction is not 0, 1, or 2 (x, y, or z)\n";
-                return glm::vec3(0, 0, 0);
+                throw std::invalid_argument("error, project_dir handed to project_in_direction is not 0, 1, or 2 (x, y, or z)\n");
         }
     }
 
@@ -97,45 +96,30 @@ namespace loader
         glm::vec3 side_a = points[(center_index + 1) % points.size()].coord - points[center_index].coord;
         glm::vec3 side_b = points[(center_index - 1 + points.size()) % points.size()].coord - points[center_index].coord;
         int project_dir = find_project_dir(glm::cross(side_a, side_b));
-        glm::vec3 ray_start = project_in_dir(points[center_index].coord, project_dir),
-                  ray_dir = project_in_dir(side_a + side_b, project_dir);
+        glm::vec2 ray_start = project_in_dir(points[center_index].coord, project_dir),
+                  ray_dir = project_in_dir(side_a + side_b + points[center_index].coord, project_dir);
+
+        float ray_slope = (ray_start[1] - ray_dir[1]) / (ray_start[0] - ray_dir[0]);
+        float ray_yint = (ray_start[1] - ray_slope * ray_start[0]);
         
         int cross_count = 0; 
 
         const float EPSILON = std::pow(2, -10);
 
         for (int seg_start_pos=0; seg_start_pos < points.size(); seg_start_pos++) {
-            glm::vec3 seg_start = project_in_dir(points[seg_start_pos].coord, project_dir),
-                      seg_dir = project_in_dir(points[(seg_start_pos + 1) % points.size()].coord, project_dir) - seg_start;
+            glm::vec2 seg_start = project_in_dir(points[seg_start_pos].coord, project_dir),
+                      seg_end = project_in_dir(points[(seg_start_pos + 1) % points.size()].coord, project_dir);
 
-            //algorithm from page 304 of graphics gems 1; by ronald goldman
-            glm::vec3 v1_cross_v2 = glm::cross(ray_dir, seg_dir);
-            float v1_cross_v2_squared = glm::dot(v1_cross_v2, v1_cross_v2);
+            float seg_slope = (seg_start[1] - seg_end[1]) / (seg_start[0] - seg_end[0]);
+            float seg_yint = (seg_start[1] - seg_slope * seg_start[0]);
 
-            if (v1_cross_v2_squared == 0.0f)
-                continue; //this will happen if parallel
-
-            float t_numerator = glm::dot(glm::cross((seg_start - ray_start), seg_dir), v1_cross_v2),
-                  t_denominator = v1_cross_v2_squared,
-                  t = t_numerator / t_denominator;
-            float s_numerator = glm::dot(glm::cross((seg_start - ray_start), ray_dir), v1_cross_v2),
-                  s_denominator = v1_cross_v2_squared,
-                  s = s_numerator / s_denominator;
-
-            //check if it's actually intersecting within the bounds
-//            std::cout << "ray intersect point: ";
-//            print_vec3((ray_start + ray_dir*t));
-//            std::cout << "segment intersect point: ";
-//            print_vec3((seg_start + seg_dir*s));
-//            std::cout << "t: " << t << " s: " << s << "\n";
-            if (t <= 0) //don't count starting vertex
+            if (ray_slope == seg_slope)
                 continue;
-            if (s < 0 || s >= 1) // if s > 1 then it will be outside the bounds of the side
-                continue;        // and if s = 1 then you'll be double counting corners if they intersect
-            if (glm::length((ray_start + ray_dir*t) - (seg_start + seg_dir*s)) <= EPSILON) {
-//                std::cout << "same" << '\n';
-                cross_count++;
-            }
+
+            float x_val = (seg_yint - ray_yint) / (ray_slope - seg_slope);
+            if (!(seg_start.x <= x_val < seg_end.x) || !(ray_start.x <= x_val))
+                continue;
+            cross_count++;
         }
         return (cross_count % 2);
 
@@ -145,9 +129,6 @@ namespace loader
     //triangulate polygon using ear clipping, for polygons with >4 vertices (bad, should probably redo)
     std::vector<std::array<unsigned int, 3>> triangulate_poly(std::vector<point>& points, std::unordered_map<std::string, unsigned int>& indices, bool winding=CW)
     {
-/*        for (auto point : points) {
-            print_vec3(point.coord);
-        }*/
         std::vector<std::array<unsigned int, 3>> out;
         int prevsize = points.size(), currsize;
         while (points.size() > 3) {
@@ -191,7 +172,6 @@ namespace loader
 
     point generate_point(const std::string& point_data, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals)
     {
-//        std::cout << "point_data=" << point_data << '\n';
         std::vector<std::string> split_arg = split(point_data, "/");
         bool error_detected = false, include_tex_data = false, include_normal_data = false;
         point curr_point;
@@ -250,12 +230,10 @@ namespace loader
     }
 
     std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>* >* process_faces(const std::vector<std::string>& faces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals)
-    { //this is extremely stupid
+    { //this is extremely stupid but for some reason
+      //it crashes if i don't use pointers instead of just copying
         std::vector<std::array<unsigned int, 3>> *point_indexes = new std::vector<std::array<unsigned int, 3>>;
         std::vector<point> *all_points = new std::vector<point>;
-#ifdef DEBUG
-        std::cout << "face count: " << faces.size() << '\n';
-#endif
         int points_sofar=0;
         bool failure = false;
         for (std::string line : faces)
@@ -287,20 +265,8 @@ namespace loader
 
             }
             point_indexes->insert(point_indexes->end(), temp.begin(), temp.end());
-//            std::cout << points_sofar << ": points_sofar\n";
-//            std::cout << std::endl << '\n';
         }
 
-#ifdef DEBUG
-        for (point x : all_points)
-            print_point(x);
-        for (auto x : point_indexes) {
-            for (int i=0; i<3; i++) {
-                std::cout << x[i] << ' ';
-            }
-            std::cout << '\n';
-        }
-#endif
         std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>* > *temp = new std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>* >;
         std::get<0>(*temp) = all_points;
         std::get<1>(*temp) = point_indexes;

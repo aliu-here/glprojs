@@ -205,12 +205,6 @@ namespace loader
             std::string str_arg1, str_arg2, str_arg3, line_type;
             line_stream >> line_type >> str_arg1 >> str_arg2 >> str_arg3;
 //            std::cout << line_type << ' ' << str_arg1 << ' ' << str_arg2 << ' ' << str_arg3 << '\n';
-            try { arg1 = std::stof(str_arg1); } 
-            catch (std::invalid_argument) {}
-            try { arg2 = std::stof(str_arg2); } 
-            catch (std::invalid_argument) {}
-            try { arg3 = std::stof(str_arg3); } 
-            catch (std::invalid_argument) {}
             //stupid but i don't want to add another function to validate floats; should be okay
             if (std::count(str_arg1.begin(), str_arg1.end(), '.') > 1)
                 arg1 = FLT_INF;
@@ -221,6 +215,13 @@ namespace loader
             line_num++;
             if (line_type == "v") { //vertex
 //                std::cout << "vert\n";
+                try { arg1 = std::stof(str_arg1); } 
+                catch (std::invalid_argument) {}
+                try { arg2 = std::stof(str_arg2); } 
+                catch (std::invalid_argument) {}
+                try { arg3 = std::stof(str_arg3); } 
+                catch (std::invalid_argument) {}
+
                 vert_data.push_back(glm::vec3(arg1, arg2, arg3));
                 int v_last_idx = vert_data.size() - 1;
                 vert_count++;
@@ -232,10 +233,20 @@ namespace loader
                 check3rd = true;
             } else if (line_type == "vt") { //uvs
 //                std::cout << "texture\n";
+                try { arg1 = std::stof(str_arg1); } 
+                catch (std::invalid_argument) {}
+                try { arg2 = std::stof(str_arg2); } 
+                catch (std::invalid_argument) {}
                 uv_coord_data.push_back(glm::vec2(arg1, arg2));
                 checkfloats = true;
             } else if (line_type == "vn") { //normals
 //                std::cout << "normal\n";
+                try { arg1 = std::stof(str_arg1); } 
+                catch (std::invalid_argument) {}
+                try { arg2 = std::stof(str_arg2); } 
+                catch (std::invalid_argument) {}
+                try { arg3 = std::stof(str_arg3); } 
+                catch (std::invalid_argument) {}
                 normal_data.push_back(glm::vec3(arg1, arg2, arg3));
                 check3rd = true;
             } else if (line_type == "f") { //face
@@ -351,13 +362,13 @@ namespace loader
                 delete temp;
             }
 //            std::cout << "finished triangulation\n";
+        } else {
+            delete curr_group_lines;
         }
         if (usemt) {
             while (finished != ocount)
                 std::this_thread::sleep_for(ms(1));
         }
-
-        delete curr_group_lines;
 
         return groups;
 

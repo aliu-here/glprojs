@@ -30,7 +30,7 @@ struct material
 {
     std::string texture_path, name;
     glm::vec3 ambient = glm::vec3(0.56, 0.56, 0.56), diffuse=glm::vec3(0.2, 0.2, 0.2), specular=glm::vec3(0.8, 0.8, 0.8); //light grey color, like blender
-    float specular_exp=0.5;
+    glm::float32_t specular_exp=0.5;
     
     material() {}
 };
@@ -38,7 +38,7 @@ struct material
 struct mesh
 {
     std::vector<point> data;
-    std::vector<std::array<unsigned int, 3>> indices;
+    std::vector<std::array<uint32_t, 3>> indices;
     std::string group_name;
     material used_mtl;
     box bounding_box;
@@ -54,6 +54,9 @@ struct mesh
             output.insert(output.end(), &(temp.raw_data[0]), &(temp.raw_data[7]));
         }
         return output;
+    }
+
+    void save_as(std::string filename) {
     }
 };
 
