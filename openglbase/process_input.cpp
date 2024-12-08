@@ -1,4 +1,4 @@
-#include "include/glad/glad.h"
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 #include <glm/glm.hpp>
@@ -6,6 +6,9 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <iostream>
+
+//first is forward, second is left, third is back, fourth is right
+const char movement_keys[4] = {'W', 'A', 'S', 'D'};
 
 class callback_funcs 
 {
@@ -76,10 +79,10 @@ class callback_funcs
 
 	void process_kb_input(GLFWwindow *window, float deltaTime, float currentTime)
 	{
-    	float cameraSpeed = static_cast<float>(speed * deltaTime);
-    		if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && currentTime - lastMouseToggle >= 0.5f){
-			glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-			lastMouseToggle = currentTime;
+        float cameraSpeed = static_cast<float>(speed * deltaTime);
+          if(glfwGetKey(window, GLFW_KEY_ESCAPE) == GLFW_PRESS && currentTime - lastMouseToggle >= 0.5f){
+            glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            lastMouseToggle = currentTime;
 			mouseLocked = false;
 			firstMouse = true;
 		}
@@ -89,14 +92,14 @@ class callback_funcs
 		//left right, forward backwards movement
 		if(glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS && glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
 			glfwSetWindowShouldClose(window, true);
-    		if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS)
-        		cameraPos += cameraSpeed * cameraFront;
-    		if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS)
-        		cameraPos -= cameraSpeed * cameraFront;
-    		if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS)
-        		cameraPos -= right * cameraSpeed;
-    		if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS)
-        		cameraPos += right * cameraSpeed;
+    	if (glfwGetKey(window, movement_keys[0]) == GLFW_PRESS)
+    		cameraPos += cameraSpeed * cameraFront;
+		if (glfwGetKey(window, movement_keys[2]) == GLFW_PRESS)
+            cameraPos -= cameraSpeed * cameraFront;
+    	if (glfwGetKey(window, movement_keys[1]) == GLFW_PRESS)
+    		cameraPos -= right * cameraSpeed;
+    	if (glfwGetKey(window, movement_keys[3]) == GLFW_PRESS)
+       		cameraPos += right * cameraSpeed;
 		//toggle between global up down or relative to camera
 		if (glfwGetKey(window, GLFW_KEY_T) == GLFW_PRESS && currentTime - lastUpToggle >= 0.5f)
 		{
@@ -123,15 +126,15 @@ class callback_funcs
         		lastX = xpos;
         		lastY = ypos;
         		firstMouse = false;
-    		}
+    	}
 	
-	    	float xoffset = xpos - lastX;
-	    	float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
-	    	lastX = xpos;
-	    	lastY = ypos;
+	    float xoffset = xpos - lastX;
+	    float yoffset = lastY - ypos; // reversed since y-coordinates go from bottom to top
+	    lastX = xpos;
+	    lastY = ypos;
 	
-	    	float sensitivity = mouseSens; // change this value to your liking
-	    	xoffset *= sensitivity;
+	    float sensitivity = mouseSens; // change this value to your liking
+	    xoffset *= sensitivity;
 		yoffset *= sensitivity;
 		
 		yaw += xoffset;
