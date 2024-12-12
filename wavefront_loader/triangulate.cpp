@@ -57,15 +57,15 @@ namespace loader
         return input_winding ? (std::array<unsigned int, 3>){vertices[0], vertices[2], vertices[1]} : (std::array<unsigned int, 3>){vertices[0], vertices[1], vertices[2]};
     }
 
-    glm::vec2 project_in_dir(glm::vec3 vec, int project_dir) 
+    glm::vec3 project_in_dir(glm::vec3 vec, int project_dir) 
     {
         switch (project_dir) {
             case x:
-                return glm::vec2(vec[1], vec[2]);
+                return glm::vec3(0, vec[1], vec[2]);
             case y:
-                return glm::vec2(vec[0], vec[2]);
+                return glm::vec3(vec[0], 0, vec[2]);
             case z:
-                return glm::vec2(vec[0], vec[1]);
+                return glm::vec3(vec[0], vec[1], 0);
             default:
                 throw std::invalid_argument("error, project_dir handed to project_in_direction is not 0, 1, or 2 (x, y, or z)\n");
         }
@@ -90,42 +90,48 @@ namespace loader
         return project_dir;
     }
 
-
     bool angle_direction_is_into_polygon(std::vector<point>& points, int center_index) 
     {
         glm::vec3 side_a = points[(center_index + 1) % points.size()].coord - points[center_index].coord;
         glm::vec3 side_b = points[(center_index - 1 + points.size()) % points.size()].coord - points[center_index].coord;
         int project_dir = find_project_dir(glm::cross(side_a, side_b));
-        glm::vec2 ray_start = project_in_dir(points[center_index].coord, project_dir),
-                  ray_dir = project_in_dir(side_a + side_b + points[center_index].coord, project_dir);
-
-        float ray_slope = (ray_start[1] - ray_dir[1]) / (ray_start[0] - ray_dir[0]);
-        float ray_yint = (ray_start[1] - ray_slope * ray_start[0]);
+        glm::vec3 ray_start = project_in_dir(points[center_index].coord, project_dir),
+                  ray_dir = project_in_dir(side_a + side_b, project_dir);
         
         int cross_count = 0; 
 
         const float EPSILON = std::pow(2, -10);
 
         for (int seg_start_pos=0; seg_start_pos < points.size(); seg_start_pos++) {
-            glm::vec2 seg_start = project_in_dir(points[seg_start_pos].coord, project_dir),
-                      seg_end = project_in_dir(points[(seg_start_pos + 1) % points.size()].coord, project_dir);
+            glm::vec3 seg_start = project_in_dir(points[seg_start_pos].coord, project_dir),
+                      seg_dir = project_in_dir(points[(seg_start_pos + 1) % points.size()].coord, project_dir) - seg_start;
 
-            float seg_slope = (seg_start[1] - seg_end[1]) / (seg_start[0] - seg_end[0]);
-            float seg_yint = (seg_start[1] - seg_slope * seg_start[0]);
+            //algorithm from page 304 of graphics gems 1; by ronald goldman
+            glm::vec3 v1_cross_v2 = glm::cross(ray_dir, seg_dir);
+            float v1_cross_v2_squared = glm::dot(v1_cross_v2, v1_cross_v2);
 
-            if (ray_slope == seg_slope)
+            if (v1_cross_v2_squared == 0.0f)
+                continue; //this will happen if parallel
+
+            float t_numerator = glm::dot(glm::cross((seg_start - ray_start), seg_dir), v1_cross_v2),
+                  t_denominator = v1_cross_v2_squared,
+                  t = t_numerator / t_denominator;
+            float s_numerator = glm::dot(glm::cross((seg_start - ray_start), ray_dir), v1_cross_v2),
+                  s_denominator = v1_cross_v2_squared,
+                  s = s_numerator / s_denominator;
+
+            //check if it's actually intersecting within the bounds
+            if (t <= 0) //don't count starting vertex
                 continue;
-
-            float x_val = (seg_yint - ray_yint) / (ray_slope - seg_slope);
-            if (!(seg_start.x <= x_val < seg_end.x) || !(ray_start.x <= x_val))
-                continue;
-            cross_count++;
+            if (s < 0 || s >= 1) // if s > 1 then it will be outside the bounds of the side
+                continue;        // and if s = 1 then you'll be double counting corners if they intersect
+            if (glm::length((ray_start + ray_dir*t) - (seg_start + seg_dir*s)) <= EPSILON) {
+                cross_count++;
+            }
         }
         return (cross_count % 2);
 
     }
-
-
     //triangulate polygon using ear clipping, for polygons with >4 vertices (bad, should probably redo)
     std::vector<std::array<unsigned int, 3>> triangulate_poly(std::vector<point>& points, std::unordered_map<std::string, unsigned int>& indices, bool winding=CW)
     {
