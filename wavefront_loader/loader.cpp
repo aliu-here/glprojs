@@ -71,7 +71,7 @@ namespace loader
                     curr_name = str_arg1;
                     curr_material.name = str_arg1;
                 } else if (line_type == "map_Kd") { //hope the texture's in the same path 
-                    std::vector<std::string> split_path = split(path, "/");
+                    std::vector<std::string_view> split_path = split(path, "/");
                     split_path.pop_back();
                     split_path.push_back(str_arg1);
                     curr_material.texture_path = join(split_path, "/");
@@ -287,7 +287,7 @@ namespace loader
                 curr_group_lines = new std::vector<std::string>;
                 face_count = 0;
             } else if (line_type == "mtllib") { // hope you used global paths
-                std::vector<std::string> split_path = split(path, std::string("/"));
+                std::vector<std::string_view> split_path = split(path, std::string("/"));
                 split_path.pop_back();
                 split_path.push_back(str_arg1);
                 materials = load_mtl(join(split_path, "/"));

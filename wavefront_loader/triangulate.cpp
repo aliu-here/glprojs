@@ -176,19 +176,19 @@ namespace loader
         return out;
     }
 
-    point generate_point(const std::string& point_data, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals)
+    point generate_point(const std::string_view& point_data, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals)
     {
-        std::vector<std::string> split_arg = split(point_data, "/");
+        std::vector<std::string_view> split_arg = split(point_data, "/");
         bool error_detected = false, include_tex_data = false, include_normal_data = false;
         point curr_point;
         std::vector<int> locs;
-        for (std::string num: split_arg)
+        for (std::string_view num: split_arg)
         {
             if (num == std::string(""))
                 locs.push_back(0);
             else
                 try {
-                    locs.push_back(std::stoi(num));
+                    locs.push_back(to_int(num));
                 } catch (std::invalid_argument) {
                     error_detected = true;
                 }
@@ -242,12 +242,12 @@ namespace loader
         std::vector<point> *all_points = new std::vector<point>;
         int points_sofar=0;
         bool failure = false;
-        for (std::string line : faces)
+        for (const std::string &line : faces)
         {
             std::vector<point> point_listing;
             std::unordered_map<std::string, unsigned int> indices;
             int point_count = 0;
-            std::vector<std::string> split_face = split(line, " ");
+            std::vector<std::string_view> split_face = split(line, " ");
             for (int i=1; i<split_face.size(); i++)
             {
                 point curr_point = generate_point(split_face[i], coords, tex, normals);
