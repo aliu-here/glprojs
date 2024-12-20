@@ -1,8 +1,8 @@
 #include <fstream>
 #include <string>
-#include <boost/predef.h>
 #include <stddef.h>
 #include <glm/glm.hpp>
+#include <cstring>
 #include "mesh.hpp"
 
 /*
@@ -39,16 +39,17 @@ namespace loader {
       throw(errno);
     }
 
+    bool test_endianness() {
+        int test_num = 0x41424344;
+        char *to_char;
+        to_char = reinterpret_cast<char*>(&test_num);
+        return (std::string(to_char, sizeof(int)) == "DCBA"); //returns true if little-endian, false if big-endian
+    }
+
     void save_model(model model, std::string savepath) 
     {
         std::ofstream out(savepath + ".bobj");
         out << "BOBJ";
-#ifdef BOOST_ENDIAN_BIG_WORD
-        out << "B";
-#endif
-#ifdef BOOST_ENDIAN_LITTLE_WORD
-        out << "L";
-#endif
         glm::uint32_t temp = model.size();
         out << ser_obj(&temp, sizeof(temp));
         for (mesh mesh : model) {
@@ -78,12 +79,5 @@ namespace loader {
     model load_model(std::string path)
     {
         std::string file = get_file_contents(path + ".bobj");
-#ifdef BOOST_ENDIAN_BIG_WORD
-        if (file[4] == "L") {
-
-        }
-#endif
-#ifdef BOOST_ENDIAN_LITTLE_WORD
-#endif
     }
 }
