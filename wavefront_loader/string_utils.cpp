@@ -12,19 +12,19 @@ std::vector<std::string_view> split(const std::string_view &s, const std::string
     std::string_view token;
     std::vector<std::string_view> res;
 
+    int last_pos = 0;
     while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
         token = s.substr (pos_start, pos_end - pos_start);
         pos_start = pos_end + delim_len;
         res.push_back(token);
     }
-    res.push_back (s.substr (pos_start));
-
+    res.push_back(s.substr (pos_start));
     return res;
 }
 
-int to_int(const std::string_view & input)
+int to_int(const std::string_view &input)
 {
-    int out;
+    int out = 0;
     const std::from_chars_result result = std::from_chars(input.data(), input.data() + input.size(), out);
     if(result.ec == std::errc::invalid_argument || result.ec == std::errc::result_out_of_range)
     {
@@ -35,7 +35,7 @@ int to_int(const std::string_view & input)
 
 float to_float(const std::string_view &input)
 {
-    float out;
+    float out = 0;
     const std::from_chars_result result = std::from_chars(input.data(), input.data() + input.size(), out);
     if(result.ec == std::errc::invalid_argument || result.ec == std::errc::result_out_of_range)
     {

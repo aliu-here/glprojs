@@ -1,6 +1,6 @@
 CC = clang++
-CCFLAGS = -c -O3#-fno-math-errno -fno-trapping-math
-DEBUGFLAGS = -c -Og -g
+CCFLAGS = -c -O3 #-fno-math-errno -fno-trapping-math
+DEBUGFLAGS = -c -O0 -g
 
 wincc = x86_64-w64-mingw32-g++
 windirflags = -Llibmingw32 -I../includes

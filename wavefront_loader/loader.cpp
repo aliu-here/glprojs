@@ -2,7 +2,6 @@
 #include <iostream>
 #include <unordered_map>
 #include <algorithm>
-#include <sstream>
 #include <cstring>
 #include <array>
 #include <tuple>
@@ -20,9 +19,9 @@ namespace loader
 { 
     //this only works if the user gives the correct path 
     //loads a material, stores ambient, diffuse, specular as glm::vec3 and stores specular_exponent as float
-    std::unordered_map<std::string, material> load_mtl(const std::string& path)
+    std::unordered_map<std::string_view, material> load_mtl(const std::string& path)
     {
-        std::unordered_map<std::string, material> materials;
+        std::unordered_map<std::string_view, material> materials;
         std::vector<std::string> names;
         material curr_material;
         std::ifstream mtl_file;
@@ -38,16 +37,23 @@ namespace loader
         {
             bool check_1st=false, check_rest=false;
             line_num++;
-            std::string str_arg1, str_arg2, str_arg3, line_type;
+            std::string_view str_arg1 = "", str_arg2 = "", str_arg3 = "", line_type = "";
             float arg1, arg2, arg3;
-            std::stringstream line_stream(line);
-            line_stream >> line_type >> str_arg1 >> str_arg2 >> str_arg3;
+            std::vector<std::string_view> split_line = split(line, " ");
 
-            try { arg1 = std::stof(str_arg1); } 
+            line_type = split_line[0];
+            if (split_line.size() > 1)
+                str_arg1 = split_line[1];
+            if (split_line.size() > 2)
+                str_arg2 = split_line[2];
+            if (split_line.size() > 3)
+                str_arg3 = split_line[3];
+
+            try { arg1 = to_float(str_arg1); } 
             catch (std::invalid_argument) {}
-            try { arg2 = std::stof(str_arg2); } 
+            try { arg2 = to_float(str_arg2); } 
             catch (std::invalid_argument) {}
-            try { arg3 = std::stof(str_arg3); } 
+            try { arg3 = to_float(str_arg3); } 
             catch (std::invalid_argument) {}
 
             try {
@@ -170,6 +176,7 @@ namespace loader
     //pass it an std::string specifying path and it returns meshes
     std::vector<mesh> loader(const std::string& path, bool usemt = false, int thread_count =0)
     {
+        std::cout << "loader::loader called\n";
 //        std::cout << usemt << '\n';
         if (usemt && thread_count == 0)
             std::cerr << "loader::loader: Number of threads to use per section must be specified if multithreading is enabled\n";
@@ -187,13 +194,12 @@ namespace loader
         std::vector<glm::vec2> uv_coord_data;
         std::vector<std::vector<std::string>> faces_per_group;
         std::vector<std::string> *curr_group_lines = new std::vector<std::string>; //to each their own; so the vec doesn't get overwritten when another one uses it
-        std::unordered_map<std::string, material> materials;
+        std::unordered_map<std::string_view, material> materials;
         std::vector<mesh> groups;
         std::vector<int> line_nums;
         mesh curr_group;
 
         std::string line="";
-        std::stringstream line_stream;
         int line_num = 0, face_count = 0, line_num_for_triangulate = 0, ocount = 0;
         mesh empty_mesh;
         int vert_count=0;
@@ -201,25 +207,21 @@ namespace loader
         {
             bool check3rd = false, checkfloats = false;
             float arg1=FLT_INF, arg2=FLT_INF, arg3=FLT_INF;
-            line_stream = std::stringstream(line);
-            std::string str_arg1, str_arg2, str_arg3, line_type;
-            line_stream >> line_type >> str_arg1 >> str_arg2 >> str_arg3;
-//            std::cout << line_type << ' ' << str_arg1 << ' ' << str_arg2 << ' ' << str_arg3 << '\n';
-            //stupid but i don't want to add another function to validate floats; should be okay
-            if (std::count(str_arg1.begin(), str_arg1.end(), '.') > 1)
-                arg1 = FLT_INF;
-            if (std::count(str_arg2.begin(), str_arg2.end(), '.') > 1)
-                arg2 = FLT_INF;
-            if (std::count(str_arg3.begin(), str_arg3.end(), '.') > 1)
-                arg3 = FLT_INF;
+            std::string_view str_arg1, str_arg2, str_arg3, line_type;
+            std::vector<std::string_view> split_line = split(line, " ");
+            str_arg1 = split_line[1];
+            str_arg2 = split_line[2];
+            str_arg3 = split_line[3];
+            line_type = split_line[0];
+
             line_num++;
             if (line_type == "v") { //vertex
 //                std::cout << "vert\n";
-                try { arg1 = std::stof(str_arg1); } 
+                try { arg1 = to_float(str_arg1); } 
                 catch (std::invalid_argument) {}
-                try { arg2 = std::stof(str_arg2); } 
+                try { arg2 = to_float(str_arg2); } 
                 catch (std::invalid_argument) {}
-                try { arg3 = std::stof(str_arg3); } 
+                try { arg3 = to_float(str_arg3); } 
                 catch (std::invalid_argument) {}
 
                 vert_data.push_back(glm::vec3(arg1, arg2, arg3));
@@ -233,19 +235,19 @@ namespace loader
                 check3rd = true;
             } else if (line_type == "vt") { //uvs
 //                std::cout << "texture\n";
-                try { arg1 = std::stof(str_arg1); } 
+                try { arg1 = to_float(str_arg1); } 
                 catch (std::invalid_argument) {}
-                try { arg2 = std::stof(str_arg2); } 
+                try { arg2 = to_float(str_arg2); } 
                 catch (std::invalid_argument) {}
                 uv_coord_data.push_back(glm::vec2(arg1, arg2));
                 checkfloats = true;
             } else if (line_type == "vn") { //normals
 //                std::cout << "normal\n";
-                try { arg1 = std::stof(str_arg1); } 
+                try { arg1 = to_float(str_arg1); } 
                 catch (std::invalid_argument) {}
-                try { arg2 = std::stof(str_arg2); } 
+                try { arg2 = to_float(str_arg2); } 
                 catch (std::invalid_argument) {}
-                try { arg3 = std::stof(str_arg3); } 
+                try { arg3 = to_float(str_arg3); } 
                 catch (std::invalid_argument) {}
                 normal_data.push_back(glm::vec3(arg1, arg2, arg3));
                 check3rd = true;
@@ -370,10 +372,13 @@ namespace loader
                 std::this_thread::sleep_for(ms(1));
         }
 
+        std::cout << "loader::loader finished successfully\n";
         return groups;
 
         exit_on_failure:
         delete curr_group_lines;
+        std::cout << "loader::loader failed\n";
+
         return {};
     }
 }
