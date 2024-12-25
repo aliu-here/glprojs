@@ -8,15 +8,16 @@
 #include <atomic>
 #include <thread>
 #include <chrono>
+#include <memory>
 
 #include "mesh.hpp"
 #include "string_utils.hpp"
 #include "triangulate.hpp"
 
-#define ms(x) std::chrono::milliseconds(x)
-
 namespace loader
 { 
+    using namespace std::chrono_literals;
+
     //this only works if the user gives the correct path 
     //loads a material, stores ambient, diffuse, specular as glm::vec3 and stores specular_exponent as float
     std::unordered_map<std::string, material> load_mtl(const std::string& path)
@@ -112,7 +113,7 @@ namespace loader
         std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>*> *processed_out = process_faces(assignedfaces, verts, uvcoords, normals);
 
         while (outvec_used)
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::this_thread::sleep_for(1ms);
 
         outvec[id] = processed_out;
 
@@ -138,7 +139,7 @@ namespace loader
 
 
         while (worker_finished != thread_count)
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::this_thread::sleep_for(1ms);
 
 
         delete allfaces;
@@ -162,7 +163,7 @@ namespace loader
         }
 
         while (vec_used)
-            std::this_thread::sleep_for(std::chrono::milliseconds(1)); //dont destroy cpu usage; check every ms instead of every cycle
+            std::this_thread::sleep_for(1ms); //dont destroy cpu usage; check every ms instead of every cycle
         
         vec_used.store(true);
         out_groups.push_back(group);
@@ -175,6 +176,7 @@ namespace loader
     //pass it an std::string specifying path and it returns meshes
     std::vector<mesh> loader(const std::string& path, bool usemt = true, int thread_count = 8)
     {
+        using namespace std::chrono_literals;
         std::cout << "loader::loader called\n";
 
         std::atomic<bool> used = false;
@@ -189,7 +191,7 @@ namespace loader
         std::vector<glm::vec3> vert_data, normal_data;
         std::vector<glm::vec2> uv_coord_data;
         std::vector<std::vector<std::string>> faces_per_group;
-        std::vector<std::string> *curr_group_lines = new std::vector<std::string>; //to each their own; so the vec doesn't get overwritten when another one uses it
+        std::unique_ptr<std::vector<std::string>> curr_group_lines = std::make_unique<std::vector<std::string>>(); //to each their own; so the vec doesn't get overwritten when another one uses it
         std::unordered_map<std::string, material> materials;
         std::vector<mesh> groups;
         std::vector<int> line_nums;
@@ -272,14 +274,10 @@ namespace loader
                         curr_group.indices = *std::get<1>(*temp);
                         groups.push_back(curr_group);
 
-
-                        delete curr_group_lines;
                         delete std::get<0>(*temp);
                         delete std::get<1>(*temp);
                         delete temp;
                     }
-                } else {
-                    delete curr_group_lines;
                 }
 
                 mesh new_mesh; //clear the current mesh
@@ -288,7 +286,7 @@ namespace loader
                 if (groups.size() > 0)
                     curr_group.used_mtl = groups[groups.size() - 1].used_mtl;
 
-                curr_group_lines = new std::vector<std::string>;
+                curr_group_lines = std::make_unique<std::vector<std::string>>();
                 face_count = 0;
             } else if (line_type == "mtllib") { // hope you used global paths
                 std::vector<std::string_view> split_path = split(path, std::string("/"));
@@ -310,13 +308,10 @@ namespace loader
                                 curr_group.indices = *std::get<1>(*temp);
                                 groups.push_back(curr_group);
 
-                                delete curr_group_lines;
                                 delete std::get<0>(*temp);
                                 delete std::get<1>(*temp);
                                 delete temp;
                             }
-                        } else {
-                            delete curr_group_lines;
                         }
 
                         mesh new_mesh; //clear the current mesh
@@ -324,7 +319,7 @@ namespace loader
                         curr_group.used_mtl = materials[str_arg1.data()];
                         curr_group.group_name = str_arg1; //so its easier to debug
 
-                        curr_group_lines = new std::vector<std::string>; //new pointer
+                        curr_group_lines = std::make_unique<std::vector<std::string>>(); //new pointer
                         face_count = 0;
                     }
                     curr_group.used_mtl = materials[str_arg1.data()];
@@ -350,21 +345,17 @@ namespace loader
                                            //oh well
                 delete temp;
             }
-        } else {
-            delete curr_group_lines;
         }
         if (usemt) {
             while (finished != ocount)
-                std::this_thread::sleep_for(ms(1));
+                std::this_thread::sleep_for(1ms);
         }
 
         std::cout << "loader::loader finished successfully\n";
         return groups;
 
         exit_on_failure:
-        delete curr_group_lines;
         std::cout << "loader::loader failed\n";
-
         return {};
     }
 }
