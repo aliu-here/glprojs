@@ -20,9 +20,9 @@ namespace loader
 
     //this only works if the user gives the correct path 
     //loads a material, stores ambient, diffuse, specular as glm::vec3 and stores specular_exponent as float
-    std::unordered_map<std::string, material> load_mtl(const std::string& path)
+    std::unordered_map<std::string_view, material> load_mtl(const std::string& path)
     {
-        std::unordered_map<std::string, material> materials;
+        std::unordered_map<std::string_view, material> materials;
         std::vector<std::string> names;
         material curr_material;
         std::ifstream mtl_file;
@@ -34,13 +34,12 @@ namespace loader
         }
         std::string curr_name;
         int line_num=0; //just to say where it went wrong
-        std::string line;
-        while (getline(mtl_file, line))
+        for (std::string line; std::getline(mtl_file, line);)
         {
             bool check_1st=false, check_rest=false;
             line_num++;
             std::string_view str_arg1 = "", str_arg2 = "", str_arg3 = "", line_type = "";
-            float arg1=NAN, arg2=NAN, arg3=NAN;
+            float arg1, arg2, arg3;
             std::vector<std::string_view> split_line = split(line, " ");
 
             line_type = split_line[0];
@@ -51,61 +50,59 @@ namespace loader
             if (split_line.size() > 3)
                 str_arg3 = split_line[3];
 
-            if (line_type[0] == 'K') {
-                try { arg1 = to_float(str_arg1); } 
-                catch (std::invalid_argument) {
-                    std::cerr << "loader::load_mtl: error in float argument 1 in file " << path << " line " << line_num << '\n';
-                }
-                try { arg2 = to_float(str_arg2); } 
-                catch (std::invalid_argument) {
-                    std::cerr << "loader::load_mtl: error in float argument 2 in file " << path << " line " << line_num << '\n'; 
-                }
-                try { arg3 = to_float(str_arg3); } 
-                catch (std::invalid_argument) {
-                    std::cerr << "loader::load_mtl: error in float argument 3 in file " << path << " line " << line_num << '\n'; 
-                }
+            try { arg1 = to_float(str_arg1); } 
+            catch (std::invalid_argument) {}
+            try { arg2 = to_float(str_arg2); } 
+            catch (std::invalid_argument) {}
+            try { arg3 = to_float(str_arg3); } 
+            catch (std::invalid_argument) {}
 
-                glm::vec3 curr_color = glm::vec3(arg1, arg2, arg3);
-                check_rest=true;
-                if (line_type == "Ka")
-                    curr_material.ambient = curr_color;
-                else if (line_type == "Kd")
-                    curr_material.diffuse = curr_color;
-                else if (line_type == "Ks")
-                    curr_material.specular = curr_color;
-            } else if (line_type == "Ns") {
-                try { arg1 = to_float(str_arg1); } 
-                catch (std::invalid_argument) {
-                    std::cerr << "loader::load_mtl: error in float argument 1 in file " << path << " line " << line_num << '\n'; 
+            try {
+                if (line_type[0] == 'K') {
+                    glm::vec3 curr_color = glm::vec3(arg1, arg2, arg3);
+                    check_rest=true;
+                    if (line_type == "Ka")
+                        curr_material.ambient = curr_color;
+                    else if (line_type == "Kd")
+                        curr_material.diffuse = curr_color;
+                    else if (line_type == "Ks")
+                        curr_material.specular = curr_color;
+                } else if (line_type == "Ns") {
+                    curr_material.specular_exp = arg1;
+                    check_1st=true;
+                } else if (line_type == "newmtl"){
+                    if (!curr_name.empty() &&
+                        materials.count(curr_name) == 0)
+                        materials.insert({curr_name, curr_material});
+                    curr_material = material();
+                    curr_name = str_arg1;
+                    curr_material.name = str_arg1;
+                } else if (line_type == "map_Kd") { //hope the texture's in the same path 
+                    std::vector<std::string_view> split_path = split(path, "/");
+                    split_path.pop_back();
+                    split_path.push_back(str_arg1);
+                    curr_material.texture_path = join(split_path, "/");
                 }
-
-                curr_material.specular_exp = arg1;
-                check_1st=true;
-            } else if (line_type == "newmtl"){
-                std::cout << "name: " << curr_name << '\n';
-                std::cout << (materials.find(curr_name) == materials.end()) << '\n';
-                std::cout << (curr_name.size() != 0) << '\n';
-                if (curr_name.size() != 0 &&
-                    materials.find(curr_name) == materials.end())
-                    materials[curr_name] = curr_material;
-
-                curr_material = material();
-                curr_name = str_arg1;
-                curr_material.name = str_arg1;
-            } else if (line_type == "map_Kd") { //hope the texture's in the same path 
-                std::vector<std::string_view> split_path = split(path, "/");
-                split_path.pop_back();
-                split_path.push_back(str_arg1);
-                curr_material.texture_path = join(split_path, "/");
+            } catch (std::invalid_argument) {
+                std::cerr << "Error in file " << path << " at line " << line_num << '\n';
+                return {};
+            }
+            bool failure=false;
+            if ((check_1st || check_rest) && std::count(str_arg1.begin(), str_arg1.end(), '.') > 1)
+                failure=true;
+            if (check_rest && std::count(str_arg2.begin(), str_arg2.end(), '.') > 1)
+                failure=true;
+            if (check_rest && std::count(str_arg3.begin(), str_arg3.end(), '.') > 1)
+                failure=true;
+            if (failure){
+                std::cerr << "Error in file " << path << " at line " << line_num << '\n';
+                return {};
             }
         }
-        std::cout << "name: " << curr_name << '\n';
         if (!curr_name.empty() &&
-            materials.find(curr_name) == materials.end())
-            materials[curr_name] = curr_material;
+            materials.count(curr_name) == 0)
+            materials.insert({curr_name, curr_material});
 
-        for (auto pair : materials)
-            std::cout << "material name: " << pair.first << '\n';
         return materials;
     }
 
@@ -133,6 +130,7 @@ namespace loader
             dist_work[i % thread_count].push_back((*allfaces)[i]);
         }
         for (int i=0; i<thread_count; i++) {
+//            std::cout << "created thread\n";
             std::thread worker(triangulate_worker, std::ref(dist_work[i]), std::ref(coords), std::ref(tex), std::ref(normals), std::ref(worker_output), std::ref(using_outvec), std::ref(worker_finished), i);
             worker.detach();
         }
@@ -149,6 +147,9 @@ namespace loader
 
         int totalpointcount = 0;
         for (auto out : worker_output) {
+/*            std::cout << "adding work\n";
+            std::cout << std::get<0>(out).size() << "vertices size\n";
+            std::cout << std::get<1>(out).size() << "indices size\n";*/
             group.data.insert(group.data.end(), std::get<0>(*out)->begin(), std::get<0>(*out)->end());
             for (int i=0; i<std::get<1>(*out)->size(); i++)
                 for (int j=0; j<3; j++)
@@ -174,10 +175,13 @@ namespace loader
     
     //if it fails it returns an empty vector
     //pass it an std::string specifying path and it returns meshes
-    std::vector<mesh> loader(const std::string& path, bool usemt = true, int thread_count = 8)
+    std::vector<mesh> loader(const std::string& path, bool usemt = false, int thread_count =0)
     {
         using namespace std::chrono_literals;
         std::cout << "loader::loader called\n";
+//        std::cout << usemt << '\n';
+        if (usemt && thread_count == 0)
+            std::cerr << "loader::loader: Number of threads to use per section must be specified if multithreading is enabled\n";
 
         std::atomic<bool> used = false;
         std::atomic<unsigned int> finished = 0;
@@ -191,8 +195,13 @@ namespace loader
         std::vector<glm::vec3> vert_data, normal_data;
         std::vector<glm::vec2> uv_coord_data;
         std::vector<std::vector<std::string>> faces_per_group;
+<<<<<<< HEAD
         std::unique_ptr<std::vector<std::string>> curr_group_lines = std::make_unique<std::vector<std::string>>(); //to each their own; so the vec doesn't get overwritten when another one uses it
         std::unordered_map<std::string, material> materials;
+=======
+        std::vector<std::string> *curr_group_lines = new std::vector<std::string>; //to each their own; so the vec doesn't get overwritten when another one uses it
+        std::unordered_map<std::string_view, material> materials;
+>>>>>>> parent of 83eb250 (modified to add error logging)
         std::vector<mesh> groups;
         std::vector<int> line_nums;
         mesh curr_group;
@@ -201,8 +210,9 @@ namespace loader
         int line_num = 0, face_count = 0, line_num_for_triangulate = 0, ocount = 0;
         mesh empty_mesh;
         int vert_count=0;
-        while (getline(obj_file, line))
+        for (;getline(obj_file, line);)
         {
+            bool check3rd = false, checkfloats = false;
             float arg1=FLT_INF, arg2=FLT_INF, arg3=FLT_INF;
             std::string_view str_arg1, str_arg2, str_arg3, line_type;
             std::vector<std::string_view> split_line = split(line, " ");
@@ -213,18 +223,13 @@ namespace loader
 
             line_num++;
             if (line_type == "v") { //vertex
+//                std::cout << "vert\n";
                 try { arg1 = to_float(str_arg1); } 
-                catch (std::invalid_argument) {
-                    std::cerr << "loader::load_mtl: error in float argument 1 in file " << path << " line " << line_num << '\n'; 
-                }
+                catch (std::invalid_argument) {}
                 try { arg2 = to_float(str_arg2); } 
-                catch (std::invalid_argument) {
-                    std::cerr << "loader::load_mtl: error in float argument 2 in file " << path << " line " << line_num << '\n'; 
-                }
+                catch (std::invalid_argument) {}
                 try { arg3 = to_float(str_arg3); } 
-                catch (std::invalid_argument) {
-                    std::cerr << "loader::load_mtl: error in float argument 3 in file " << path << " line " << line_num << '\n'; 
-                }
+                catch (std::invalid_argument) {}
 
                 vert_data.push_back(glm::vec3(arg1, arg2, arg3));
                 int v_last_idx = vert_data.size() - 1;
@@ -234,35 +239,32 @@ namespace loader
                     curr_group.bounding_box.min[i] = std::min(curr_group.bounding_box.min[i], vert_data[v_last_idx][i]);
                     curr_group.bounding_box.max[i] = std::max(curr_group.bounding_box.max[i], vert_data[v_last_idx][i]);
                 }
+                check3rd = true;
             } else if (line_type == "vt") { //uvs
+//                std::cout << "texture\n";
                 try { arg1 = to_float(str_arg1); } 
-                catch (std::invalid_argument) {
-                    std::cerr << "loader::load_mtl: error in float argument 1 in file " << path << " line " << line_num << '\n'; 
-                }
+                catch (std::invalid_argument) {}
                 try { arg2 = to_float(str_arg2); } 
-                catch (std::invalid_argument) {
-                    std::cerr << "loader::load_mtl: error in float argument 2 in file " << path << " line " << line_num << '\n'; 
-                }
+                catch (std::invalid_argument) {}
                 uv_coord_data.push_back(glm::vec2(arg1, arg2));
+                checkfloats = true;
             } else if (line_type == "vn") { //normals
+//                std::cout << "normal\n";
                 try { arg1 = to_float(str_arg1); } 
-                catch (std::invalid_argument) {
-                    std::cerr << "loader::load_mtl: error in float argument 1 in file " << path << " line " << line_num << '\n'; 
-                }
+                catch (std::invalid_argument) {}
                 try { arg2 = to_float(str_arg2); } 
-                catch (std::invalid_argument) {
-                    std::cerr << "loader::load_mtl: error in float argument 2 in file " << path << " line " << line_num << '\n'; 
-                }
+                catch (std::invalid_argument) {}
                 try { arg3 = to_float(str_arg3); } 
-                catch (std::invalid_argument) {
-                    std::cerr << "loader::load_mtl: error in float argument 3 in file " << path << " line " << line_num << '\n'; 
-                }
+                catch (std::invalid_argument) {}
                 normal_data.push_back(glm::vec3(arg1, arg2, arg3));
+                check3rd = true;
             } else if (line_type == "f") { //face
                 face_count++;
+//                std::cout << line << '\n';
                 curr_group_lines->push_back(line);
             } else if (line_type == "o") { //new objects
                 if (face_count > 0) {
+//                    std::cout << curr_group.group_name << '\n';
 
                     if (usemt) {
                         std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), std::ref(finished), std::ref(groups), std::ref(used), thread_count);
@@ -285,6 +287,7 @@ namespace loader
                 curr_group.group_name = str_arg1;
                 if (groups.size() > 0)
                     curr_group.used_mtl = groups[groups.size() - 1].used_mtl;
+//                std::cout << curr_group.group_name << '\n';
 
                 curr_group_lines = std::make_unique<std::vector<std::string>>();
                 face_count = 0;
@@ -292,12 +295,15 @@ namespace loader
                 std::vector<std::string_view> split_path = split(path, std::string("/"));
                 split_path.pop_back();
                 split_path.push_back(str_arg1);
-                std::cout << "loader::loader: file name: " << join(split_path, "/") << '\n';
                 materials = load_mtl(join(split_path, "/"));
             } else if (line_type == "usemtl") {
-                if (materials.find(str_arg1.data()) != materials.end()) {
-                    if (curr_group.used_mtl.name.size() != 0) { //check if there's already a material defined; kind of stupid but oh well
+                if (materials.count(str_arg1) != 0) {
+                    if (curr_group.used_mtl.name.size() != 0) { //check if there's already a material defined
                         if (face_count > 0) {
+#ifdef DEBUG
+                            for (auto x : *curr_group_lines)
+                                std::cout << "loader::loader - " << x << '\n';
+#endif
                             if (usemt) {
                                 std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), std::ref(finished), std::ref(groups), std::ref(used), thread_count);
                                 temp.detach();
@@ -316,17 +322,29 @@ namespace loader
 
                         mesh new_mesh; //clear the current mesh
                         curr_group = mesh();
-                        curr_group.used_mtl = materials[str_arg1.data()];
+                        curr_group.used_mtl = materials[str_arg1];
                         curr_group.group_name = str_arg1; //so its easier to debug
 
                         curr_group_lines = std::make_unique<std::vector<std::string>>(); //new pointer
                         face_count = 0;
                     }
-                    curr_group.used_mtl = materials[str_arg1.data()];
+                    curr_group.used_mtl = materials[str_arg1];
                 } else {
                     std::cerr << "Material " << str_arg1 << " was not defined\n";
                     goto exit_on_failure;
                 }
+            }
+//            std::cout << "check3rd: " << check3rd << " checkfloats: " << checkfloats << '\n';
+//            std::cout << (((arg1 == FLT_INF || arg2 == FLT_INF) && (check3rd || checkfloats))) << '\n';
+            //being FLT_INF meas that either std::stof failed or it had more than one decimal point
+            if ((arg1 == FLT_INF || arg2 == FLT_INF) && (check3rd || checkfloats)) {
+//                std::cout << line << '\n';
+                std::cerr << "Error in .obj file at line " << line_num << "\n";
+                goto exit_on_failure;
+            }
+            if (check3rd && arg3 == FLT_INF) {
+                std::cerr << "Error in file at line " << line_num << "\n";
+                goto exit_on_failure;
             }
         }
         if (face_count > 0) {
@@ -345,6 +363,12 @@ namespace loader
                                            //oh well
                 delete temp;
             }
+<<<<<<< HEAD
+=======
+//            std::cout << "finished triangulation\n";
+        } else {
+            delete curr_group_lines;
+>>>>>>> parent of 83eb250 (modified to add error logging)
         }
         if (usemt) {
             while (finished != ocount)

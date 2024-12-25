@@ -254,7 +254,7 @@ namespace loader
                 std::string serialized = point_to_string(curr_point);
                 if (indices.find(serialized) == indices.end())
                 {
-                    indices[serialized] = point_count + points_sofar;
+                    indices.insert({serialized, point_count + points_sofar});
                     point_listing.push_back(curr_point);
                     point_count++;
                 }
