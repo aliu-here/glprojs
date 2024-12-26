@@ -116,14 +116,9 @@ int main()
 
     for (loader::mesh part : model.model) {
         std::cout << '\n';
-        points.insert(points.end(), (float*)&(part.data[0]), (float*)(&(part.data[part.data.size()]))); //ugly but works
-        for (auto triangle : part.indices) {
-            for (int i=0; i<3; i++) {
-                std::cout << triangle[i] << ' ';
-                indices.push_back(triangle[i] + point_count);
-            }
-            std::cout << '\n';
-        }
+        points.insert(points.end(), part.export_points().begin(), part.export_points().end());
+        indices.insert(indices.end(), part.export_indices().begin(), part.export_indices().end());
+
         point_count += part.data.size();
     }
 
