@@ -6,6 +6,7 @@
 #include <unordered_map>
 #include <iostream>
 #include <cstring>
+#include <memory>
 
 #include "mesh.hpp"
 #include "string_utils.hpp"
@@ -37,12 +38,12 @@ namespace loader
     //this is probably a bad idea; this turns the point struct into a string so it can be used in an unordered_map
     std::string point_to_string(point point)
     {
-        return std::string((char*)&point, sizeof(point));
+        return std::string(reinterpret_cast<char*>(&point), sizeof(point));
     }
     
     std::string vec3_to_string(glm::vec3 vec)
     {
-        return std::string((char*)&vec, sizeof(vec));
+        return std::string(reinterpret_cast<char*>(&vec), sizeof(vec));
     }
 
     std::array<unsigned int, 3> wind_ccw_coords_triangle(std::array<glm::vec3, 3> coords, std::array<unsigned int, 3> vertices, glm::vec3 normal, bool input_winding=CW)
@@ -176,7 +177,7 @@ namespace loader
         return out;
     }
 
-    point generate_point(const std::string_view& point_data, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals)
+    point generate_point(const std::string_view point_data, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals)
     {
         std::vector<std::string_view> split_arg = split(point_data, "/");
         bool error_detected = false, include_tex_data = false, include_normal_data = false;
@@ -235,11 +236,10 @@ namespace loader
         return curr_point;
     }
 
-    std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>* >* process_faces(const std::vector<std::string>& faces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals)
-    { //this is extremely stupid but for some reason
-      //it crashes if i don't use pointers instead of just copying
-        std::vector<std::array<unsigned int, 3>> *point_indexes = new std::vector<std::array<unsigned int, 3>>;
-        std::vector<point> *all_points = new std::vector<point>;
+    std::tuple<std::unique_ptr<std::vector<point>>, std::unique_ptr<std::vector<std::array<unsigned int, 3>>>> process_faces(const std::vector<std::string>& faces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals)
+    {
+        std::unique_ptr<std::vector<std::array<unsigned int, 3>>> point_indexes = std::make_unique<std::vector<std::array<unsigned int, 3>>>();
+        std::unique_ptr<std::vector<point>> all_points = std::make_unique<std::vector<point>>();
         int points_sofar=0;
         bool failure = false;
         for (const std::string &line : faces)
@@ -265,17 +265,12 @@ namespace loader
             all_points->insert(all_points->end(), point_listing.begin(), point_listing.end());
             std::vector<std::array<unsigned int, 3>> temp = triangulate_poly(point_listing, indices);
             if (temp.size() == 0) {
-                delete all_points;
-                delete point_indexes;
                 return {};
 
             }
             point_indexes->insert(point_indexes->end(), temp.begin(), temp.end());
         }
 
-        std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>* > *temp = new std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>* >;
-        std::get<0>(*temp) = all_points;
-        std::get<1>(*temp) = point_indexes;
-        return temp;
+        return {std::move(all_points), std::move(point_indexes)};
     }
 }

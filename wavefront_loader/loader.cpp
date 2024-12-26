@@ -7,7 +7,6 @@
 #include <tuple>
 #include <atomic>
 #include <thread>
-#include <chrono>
 #include <memory>
 
 #include "mesh.hpp"
@@ -25,8 +24,8 @@ namespace loader
         std::unordered_map<std::string, material> materials;
         std::vector<std::string> names;
         material curr_material;
-        std::ifstream mtl_file;
-        mtl_file.open(path);
+        std::ifstream mtl_file(path);
+
         if (mtl_file.fail())
         {
             std::cerr << "Failed to open material file\n";
@@ -37,7 +36,6 @@ namespace loader
         std::string line;
         while (getline(mtl_file, line))
         {
-            bool check_1st=false, check_rest=false;
             line_num++;
             std::string_view str_arg1 = "", str_arg2 = "", str_arg3 = "", line_type = "";
             float arg1=NAN, arg2=NAN, arg3=NAN;
@@ -66,7 +64,6 @@ namespace loader
                 }
 
                 glm::vec3 curr_color = glm::vec3(arg1, arg2, arg3);
-                check_rest=true;
                 if (line_type == "Ka")
                     curr_material.ambient = curr_color;
                 else if (line_type == "Kd")
@@ -80,7 +77,6 @@ namespace loader
                 }
 
                 curr_material.specular_exp = arg1;
-                check_1st=true;
             } else if (line_type == "newmtl"){
                 std::cout << "name: " << curr_name << '\n';
                 std::cout << (materials.find(curr_name) == materials.end()) << '\n';
@@ -109,21 +105,15 @@ namespace loader
         return materials;
     }
 
-    void triangulate_worker(std::vector<std::string>& assignedfaces, const std::vector<glm::vec3>& verts, const std::vector<glm::vec2>& uvcoords, const std::vector<glm::vec3>& normals, std::vector<std::tuple<std::vector<point>*, std::vector<std::array<unsigned int,3>>*>*>& outvec, std::atomic<bool>& outvec_used, std::atomic<unsigned int>& finished, int id) {
-        std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>*> *processed_out = process_faces(assignedfaces, verts, uvcoords, normals);
-
-        while (outvec_used)
-            std::this_thread::sleep_for(1ms);
-
-        outvec[id] = processed_out;
-
+    void triangulate_worker(std::vector<std::string>& assignedfaces, const std::vector<glm::vec3>& verts, const std::vector<glm::vec2>& uvcoords, const std::vector<glm::vec3>& normals, std::vector<std::tuple<std::unique_ptr<std::vector<point>>, std::unique_ptr<std::vector<std::array<unsigned int, 3>>>>>& outvec, std::atomic<bool>& outvec_used, std::atomic<unsigned int>& finished, int id) {
+        outvec[id] = process_faces(assignedfaces, verts, uvcoords, normals); //race condition is impossible
         finished.fetch_add(1);
     }
 
     //calls the triangulation functions; packaged into a function for parallelization
-    void threaded_triangulate_boss(mesh group, std::vector<std::string> *allfaces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, std::atomic<unsigned int>& done_flag, std::vector<mesh>& out_groups, std::atomic<bool>& vec_used, int thread_count) {
+    void threaded_triangulate_boss(mesh group, std::unique_ptr<std::vector<std::string>> allfaces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, std::atomic<unsigned int>& done_flag, std::vector<mesh>& out_groups, std::atomic<bool>& vec_used, int thread_count) {
 
-        std::vector<std::tuple<std::vector<point>*, std::vector<std::array<unsigned int, 3>>*>*> worker_output(thread_count);
+        std::vector<std::tuple<std::unique_ptr<std::vector<point>>, std::unique_ptr<std::vector<std::array<unsigned int, 3>>>>> worker_output(thread_count);
 
         std::atomic<unsigned int> worker_finished = 0;
         std::atomic<bool> using_outvec = false;
@@ -137,29 +127,23 @@ namespace loader
             worker.detach();
         }
 
-
         while (worker_finished != thread_count)
             std::this_thread::sleep_for(1ms);
 
-
-        delete allfaces;
 
         group.data.clear();
         group.indices.clear();
 
         int totalpointcount = 0;
-        for (auto out : worker_output) {
-            group.data.insert(group.data.end(), std::get<0>(*out)->begin(), std::get<0>(*out)->end());
-            for (int i=0; i<std::get<1>(*out)->size(); i++)
-                for (int j=0; j<3; j++)
-                    (*std::get<1>(*out))[i][j] += totalpointcount;
-            group.indices.insert(group.indices.end(), std::get<1>(*out)->begin(), std::get<1>(*out)->end());
+        for (int i=0; i<worker_output.size(); i++) {
+            group.data.insert(group.data.end(), std::get<0>(worker_output[i])->begin(), std::get<0>(worker_output[i])->end());
+            for (int j=0; j<std::get<1>(worker_output[i])->size(); j++)
+                for (int k=0; k<3; k++)
+                    (*std::get<1>(worker_output[i])).at(j).at(k) += totalpointcount;
+            group.indices.insert(group.indices.end(), std::get<1>(worker_output[i])->begin(), std::get<1>(worker_output[i])->end());
 
             totalpointcount = group.data.size();
 
-            delete std::get<0>(*out);
-            delete std::get<1>(*out);
-            delete out;
         }
 
         while (vec_used)
@@ -263,24 +247,18 @@ namespace loader
                 curr_group_lines->push_back(line);
             } else if (line_type == "o") { //new objects
                 if (face_count > 0) {
-
                     if (usemt) {
-                        std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), std::ref(finished), std::ref(groups), std::ref(used), thread_count);
+                        std::thread temp(threaded_triangulate_boss, curr_group, std::move(curr_group_lines), std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), std::ref(finished), std::ref(groups), std::ref(used), thread_count);
                         temp.detach();
                         ocount++;
                     } else {
                         auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data);
-                        curr_group.data = *std::get<0>(*temp);
-                        curr_group.indices = *std::get<1>(*temp);
+                        curr_group.data = *std::get<0>(temp);
+                        curr_group.indices = *std::get<1>(temp);
                         groups.push_back(curr_group);
-
-                        delete std::get<0>(*temp);
-                        delete std::get<1>(*temp);
-                        delete temp;
                     }
                 }
 
-                mesh new_mesh; //clear the current mesh
                 curr_group = mesh();
                 curr_group.group_name = str_arg1;
                 if (groups.size() > 0)
@@ -299,22 +277,17 @@ namespace loader
                     if (curr_group.used_mtl.name.size() != 0) { //check if there's already a material defined; kind of stupid but oh well
                         if (face_count > 0) {
                             if (usemt) {
-                                std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), std::ref(finished), std::ref(groups), std::ref(used), thread_count);
+                                std::thread temp(threaded_triangulate_boss, curr_group, std::move(curr_group_lines), std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), std::ref(finished), std::ref(groups), std::ref(used), thread_count);
                                 temp.detach();
                                 ocount++;
                             } else {
                                 auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data);
-                                curr_group.data = *std::get<0>(*temp);
-                                curr_group.indices = *std::get<1>(*temp);
+                                curr_group.data = *std::get<0>(temp);
+                                curr_group.indices = *std::get<1>(temp);
                                 groups.push_back(curr_group);
-
-                                delete std::get<0>(*temp);
-                                delete std::get<1>(*temp);
-                                delete temp;
                             }
                         }
 
-                        mesh new_mesh; //clear the current mesh
                         curr_group = mesh();
                         curr_group.used_mtl = materials[str_arg1.data()];
                         curr_group.group_name = str_arg1; //so its easier to debug
@@ -325,25 +298,20 @@ namespace loader
                     curr_group.used_mtl = materials[str_arg1.data()];
                 } else {
                     std::cerr << "Material " << str_arg1 << " was not defined\n";
-                    goto exit_on_failure;
+                    return {};
                 }
             }
         }
         if (face_count > 0) {
             if (usemt) {
-                std::thread temp(threaded_triangulate_boss, curr_group, curr_group_lines, std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), std::ref(finished), std::ref(groups), std::ref(used), thread_count);
+                std::thread temp(threaded_triangulate_boss, curr_group, std::move(curr_group_lines), std::ref(vert_data), std::ref(uv_coord_data), std::ref(normal_data), std::ref(finished), std::ref(groups), std::ref(used), thread_count);
                 temp.detach();
                 ocount++;
             } else {
                 auto temp = process_faces(*curr_group_lines, vert_data, uv_coord_data, normal_data);
-                curr_group.data = *std::get<0>(*temp);
-                curr_group.indices = *std::get<1>(*temp);
+                curr_group.data = *std::get<0>(temp);
+                curr_group.indices = *std::get<1>(temp);
                 groups.push_back(curr_group);
-
-                delete std::get<0>(*temp);
-                delete std::get<1>(*temp); //this is ass bc i have to repeat this exact segment like five times
-                                           //oh well
-                delete temp;
             }
         }
         if (usemt) {
@@ -353,9 +321,5 @@ namespace loader
 
         std::cout << "loader::loader finished successfully\n";
         return groups;
-
-        exit_on_failure:
-        std::cout << "loader::loader failed\n";
-        return {};
     }
 }
