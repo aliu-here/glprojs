@@ -6,7 +6,7 @@
 #include <stdexcept>
 
 //stolen from stackoverflow
-std::vector<std::string_view> split(const std::string_view &s, const std::string_view& delimiter) 
+std::vector<std::string_view> split(const std::string_view s, const std::string_view delimiter) 
 {
     size_t pos_start = 0, pos_end, delim_len = delimiter.length();
     std::string_view token;
@@ -22,7 +22,7 @@ std::vector<std::string_view> split(const std::string_view &s, const std::string
     return res;
 }
 
-int to_int(const std::string_view &input)
+int to_int(const std::string_view input)
 {
     int out = 0;
     const std::from_chars_result result = std::from_chars(input.data(), input.data() + input.size(), out);
@@ -33,7 +33,7 @@ int to_int(const std::string_view &input)
     return out;
 }
 
-float to_float(const std::string_view &input)
+float to_float(const std::string_view input)
 {
     float out = 0;
     const std::from_chars_result result = std::from_chars(input.data(), input.data() + input.size(), out);
@@ -44,7 +44,7 @@ float to_float(const std::string_view &input)
     return out;
 }
 
-std::string join(const std::vector<std::string_view>& array, const std::string_view& join_string)
+std::string join(const std::vector<std::string_view>& array, const std::string_view join_string)
 {
         std::string output;
         int i=0;
