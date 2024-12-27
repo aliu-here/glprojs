@@ -1,83 +1,82 @@
 #include <fstream>
-#include <string>
-#include <stddef.h>
-#include <glm/glm.hpp>
+#include <bit>
+#include <limits>
+#include <cstdint>
 #include <cstring>
-#include "mesh.hpp"
-
-/*
- * file description:
- * header: char[4] "BOBJ"
- * endianness flag: char either "B" or "L"
- * mesh count: uint32
- * per mesh:
- * mesh name size (in bytes): uint32
- * mesh name: char[mesh name size]
- * points vector size (in bytes): uint32
- * 
- * */
+#include <cmath>
+#include <iostream>
 
 namespace loader {
-
-    std::string ser_obj(void *objptr, unsigned int size) {
-        return std::string(reinterpret_cast<char*>(objptr), size);
-    }
-
-    std::string get_file_contents(std::string filename)
+    constexpr bool is_little_endian()
     {
-      std::ifstream in(filename, std::ios::in | std::ios::binary);
-      if (in)
-      {
-        std::string contents;
-        in.seekg(0, std::ios::end);
-        contents.resize(in.tellg());
-        in.seekg(0, std::ios::beg);
-        in.read(&contents[0], contents.size());
-        in.close();
-        return(contents);
-      }
-      throw(errno);
+        return std::endian::native == std::endian::little;
     }
 
-    bool test_endianness() {
-        int test_num = 0x41424344;
-        char *to_char;
-        to_char = reinterpret_cast<char*>(&test_num);
-        return (std::string(to_char, sizeof(int)) == "DCBA"); //returns true if little-endian, false if big-endian
-    }
-
-    void save_model(model model, std::string savepath) 
+    uint32_t float_to_ieee_754(float value) 
     {
-        std::ofstream out(savepath + ".bobj");
-        out << "BOBJ";
-        glm::uint32_t temp = model.size();
-        out << ser_obj(&temp, sizeof(temp));
-        for (mesh mesh : model) {
-            temp = mesh.group_name.size();
-            out << ser_obj(&temp, sizeof(temp)); 
-            out << mesh.group_name;
-            temp = mesh.data.size() * sizeof(point);
-            out << ser_obj(&temp, sizeof(temp));
-            for (point point : mesh.data) { //print point data
-                out << ser_obj(&point, sizeof(point));
-            }
-            temp = mesh.indices.size() * 3 * sizeof(uint32_t);
-            out << ser_obj(&temp, sizeof(int));
-            for (std::array<unsigned int, 3> tri : mesh.indices) {
-                out << ser_obj(&tri, sizeof(tri));
-            }
-
-            temp = mesh.used_mtl.name.size();
-            out << ser_obj(&temp, sizeof(int));
-            out << mesh.used_mtl.name;
-            out << ser_obj(&mesh.used_mtl.ambient, sizeof(glm::vec3));
-            out << ser_obj(&mesh.used_mtl.diffuse, sizeof(glm::vec3));
-            out << ser_obj(&mesh.used_mtl.specular, sizeof(glm::vec3));
-            out << ser_obj(&mesh.used_mtl.specular_exp, sizeof(glm::float32_t));
+        const uint32_t sign_shift = 31, exp_shift = 23;
+        uint32_t ieee_754_fmt = 0;
+        ieee_754_fmt |= (value < 0) << sign_shift;
+        if (value == 0)
+            return ieee_754_fmt; // only need sign
+        double dbl_exp = std::log2(std::abs(value));
+        int exp = std::round(dbl_exp);
+        unsigned char exp_8b;
+        if (exp < -126) {
+            exp_8b = 0;
+        } else if (exp > 127) {
+            return 0x7f800000 | ((value < 0) << sign_shift); // signed inf
+        } else {
+            exp_8b = exp + 127;
         }
+
+        ieee_754_fmt |= exp_8b << exp_shift;
+
+        double significand = value / (std::exp2(exp)) - 1;
+        uint32_t shifted_significand = roundeven(significand * std::exp2(23)); //ieee compliance
+        ieee_754_fmt |= shifted_significand;
+        return ieee_754_fmt;
     }
-    model load_model(std::string path)
+
+    float ieee_754_to_float(uint32_t ieee_754_fmt)
     {
-        std::string file = get_file_contents(path + ".bobj");
+        const uint32_t significand_bitmask = 0x007fffff, exp_bitmask = 0x7f800000, exp_bitmask_shift = 23, sign_shift = 31;
+        float out = 0;
+        uint32_t significand = (ieee_754_fmt & significand_bitmask);
+        out = significand / (std::exp2(23)) + 1;
+        unsigned char exp = (ieee_754_fmt & exp_bitmask) >> exp_bitmask_shift;
+        std::cout << "exp: " << ((int)exp) - 127 << '\n';
+        bool sign = ieee_754_fmt >> sign_shift;
+        std::cout << "sign: " << sign << '\n';
+        if (exp == 0 && significand == 0) { // signed zeroes
+            return (sign) ? -0 : +0;
+        } else if (exp == 0) { // subnormals
+            return std::exp2(exp - 127) * significand;
+        }
+        if (exp == 255) {
+            if (significand == 0)
+                return ((sign) ? -1 : 1) * std::numeric_limits<float>::infinity();
+            else
+                return NAN;
+        }
+        return std::exp2(exp - 127) * out * ((sign) ? -1 : 1);
+    }
+
+    void write_uint32(std::ofstream out_file, uint32_t to_write)
+    {
+        unsigned char *to_chars;
+        uint32_t temp = to_write;
+        if (is_little_endian()) {
+            temp = std::byteswap(temp);
+        }
+        to_chars = reinterpret_cast<unsigned char*>(&temp);
+        out_file.write(reinterpret_cast<char*>(to_chars), sizeof(uint32_t));
+    }
+
+    uint32_t read_uint32(std::ifstream in_file) {
+        char *read_in;
+        in_file.read(read_in, sizeof(uint32_t));
+        uint32_t out = *reinterpret_cast<uint32_t*>(read_in);
+        return out;
     }
 }
