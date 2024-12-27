@@ -4,7 +4,6 @@
 #include <cstdint>
 #include <cstring>
 #include <cmath>
-#include <iostream>
 
 namespace loader {
     constexpr bool is_little_endian()
@@ -46,12 +45,10 @@ namespace loader {
         else
             significand = std::abs((double)value) / (std::exp2(exp_8b - 127)) - 1;
         uint32_t shifted_significand = significand * std::exp2(23);
-        std::cout << exp << '\n';
-        std::cout << significand << '\n';
         ieee_754_fmt |= shifted_significand;
         return ieee_754_fmt;
     }
-
+    
     float ieee_754_to_float(uint32_t ieee_754_fmt)
     {
         const uint32_t significand_bitmask = 0x007fffff, exp_bitmask = 0x7f800000, exp_shift = 23, sign_shift = 31;
@@ -76,18 +73,28 @@ namespace loader {
         return std::exp2(exp - 127) * out * ((sign) ? -1 : 1);
     }
 
-    void write_uint32(std::ofstream out_file, uint32_t to_write)
+    inline uint32_t native_to_bigendian(uint32_t in)
     {
-        unsigned char *to_chars;
-        uint32_t temp = to_write;
-        if (is_little_endian()) {
-            temp = std::byteswap(temp);
-        }
-        to_chars = reinterpret_cast<unsigned char*>(&temp);
-        out_file.write(reinterpret_cast<char*>(to_chars), sizeof(uint32_t));
+        if (is_little_endian())
+            return std::byteswap(in);
+        return in;
     }
 
-    uint32_t read_uint32(std::ifstream in_file) {
+    inline uint32_t bigendian_to_native(uint32_t in)
+    {
+        if (is_little_endian())
+            return std::byteswap(in);
+        return in;
+    }
+
+
+
+    inline void write_uint32(std::ofstream out_file, uint32_t to_write)
+    {
+        out_file.write(reinterpret_cast<char*>(&to_write), sizeof(uint32_t));
+    }
+
+    inline uint32_t read_uint32(std::ifstream in_file) {
         char *read_in;
         in_file.read(read_in, sizeof(uint32_t));
         uint32_t out = *reinterpret_cast<uint32_t*>(read_in);
