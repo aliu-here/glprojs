@@ -28,7 +28,7 @@ namespace loader {
         if (value == 0)
             return ieee_754_fmt; // only need sign
         double dbl_exp = std::log2(std::abs(value));
-        int exp = dbl_exp; //truncate so no negatives
+        int exp = std::floor(dbl_exp); //so no significands < 1
         unsigned char exp_8b;
         if (exp < -126) {
             exp_8b = 0;

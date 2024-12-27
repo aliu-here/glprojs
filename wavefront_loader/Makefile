@@ -25,6 +25,9 @@ loader:
 triangulate:
 	${CC} triangulate.cpp ${CCFLAGS}
 
+serialize_utils:
+	${CC} serialize_utils.cpp ${CCFLAGS} -std=c++23
+
 clean:
 	rm -f *.o *.a
 debug: clean
