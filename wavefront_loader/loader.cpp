@@ -146,14 +146,16 @@ namespace loader
 
         }
 
-        while (vec_used)
-            std::this_thread::sleep_for(1ms); //dont destroy cpu usage; check every ms instead of every cycle
-        
-        vec_used.store(true);
-        out_groups.push_back(group);
-        vec_used.store(false);
+        bool target = false;
 
-        done_flag.fetch_add(1);
+        while (true) {
+            if (std::atomic_compare_exchange_weak(&vec_used, &target, true)) {
+                out_groups.push_back(group);
+                vec_used.store(false);
+                done_flag.fetch_add(1);
+                break;
+            }
+        }
     }
     
     //if it fails it returns an empty vector
