@@ -1,5 +1,6 @@
 CC = clang++
 INCLUDES = 
+CXX_STD = c++23
 CCFLAGS = -c -O3 #-fno-math-errno -fno-trapping-math
 DEBUGFLAGS = -c -O0 -g -DDEBUG
 
@@ -24,16 +25,16 @@ all_win: clean string_utils triangulate loader save_load_utils
 	x86_64-w64-mingw32-ar rcs libloaderwin.a loader.o string_utils.o triangulate.o
 
 string_utils:
-	${CC} ${INCLUDES} string_utils.cpp ${CCFLAGS}
+	${CC} ${INCLUDES} string_utils.cpp ${CCFLAGS} -std=${CXX_STD}
 
 loader:
-	${CC} ${INCLUDES} loader.cpp ${CCFLAGS} 
+	${CC} ${INCLUDES} loader.cpp ${CCFLAGS} -std=${CXX_STD}
 
 triangulate:
-	${CC} ${INCLUDES} triangulate.cpp ${CCFLAGS}
+	${CC} ${INCLUDES} triangulate.cpp ${CCFLAGS} -std=${CXX_STD}
 
 save_load_utils:
-	${CC} ${INCLUDES} save_load_utils.cpp ${CCFLAGS} -std=c++23
+	${CC} ${INCLUDES} save_load_utils.cpp ${CCFLAGS} -std=${CXX_STD}
 
 clean:
 	rm -f *.o *.a

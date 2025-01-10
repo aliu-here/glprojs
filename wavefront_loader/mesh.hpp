@@ -49,11 +49,12 @@ namespace loader {
             }
             return output;
         }
-        std::vector<unsigned int> export_indices()
+        std::vector<unsigned int> export_indices(int offset=0)
         {
             std::vector<unsigned int> output;
             for (std::array<unsigned int, 3> tri : indices) {
-                output.insert(output.end(), tri.begin(), tri.end());
+                for (unsigned int val : tri)
+                    output.push_back(val + offset);
             }
             return output;
         }

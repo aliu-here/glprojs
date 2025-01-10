@@ -101,7 +101,7 @@ int main()
 
     std::vector<physics_obj*> objs;
 
-    physics_obj model(loader::loader("/home/aliu/monkey_and_cube_textured/monkey_and_cube_with_tex.obj", true, 8));
+    physics_obj model(loader::loader("/home/aliu/concave/twosphere.obj", true, 8));
     objs.push_back(&model);
 
     std::cout << "done loading\n";
@@ -112,14 +112,15 @@ int main()
     std::vector<GLfloat> points;
     std::vector<GLuint> indices;
 
-    long point_count = 0;
+    int point_count = 0;
 
     for (loader::mesh part : model.model) {
+        auto part_points = part.export_points();
+        auto part_indices = part.export_indices(point_count);
         std::cout << '\n';
-        points.insert(points.end(), part.export_points().begin(), part.export_points().end());
-        indices.insert(indices.end(), part.export_indices().begin(), part.export_indices().end());
-
-        point_count += part.data.size();
+        points.insert(points.end(), part_points.begin(), part_points.end());
+        indices.insert(indices.end(), part_indices.begin(), part_indices.end());
+        point_count += part_points.size() / 8;
     }
 
     std::cout << points.size() << '\n';
