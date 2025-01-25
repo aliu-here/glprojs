@@ -101,6 +101,24 @@ template <typename T> class octree
         leaves[curr_node.children[x_greater][y_greater][z_greater]].erase(val);
     }
 
+    std::vector<octree_node> get_children_of_node(octree_node node)
+    {
+        if (node.children_are_leaves)
+            return {};
+        std::vector<octree_node> out;
+        for (auto i : node.children) {
+            for (auto j : i) {
+                for (auto k : j) {
+                    if (k == -1) {
+                        continue;
+                    }
+                    out.push_back(nodes[k]);
+                }
+            }
+        }
+        return out;
+    }
+
     const octree_node& get_node_at_idx(int idx)
     {
         return nodes[idx];

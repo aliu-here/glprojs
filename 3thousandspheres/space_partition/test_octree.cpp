@@ -5,9 +5,9 @@ int main()
 {
     octree<int> tree = octree<int>();
     int counter = 0;
-    for (int i=-5; i < 6; i++) {
-        for (int j=-5; j < 6; j++) {
-            for (int k=-5; k< 6; k++) {
+    for (int i=-5; i < 11; i++) {
+        for (int j=-5; j < 11; j++) {
+            for (int k=-5; k< 11; k++) {
                 tree.add_point(glm::vec3(i, j, k), counter);
                 counter++;
             }
