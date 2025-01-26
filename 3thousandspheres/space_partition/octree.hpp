@@ -120,6 +120,27 @@ template <typename T> class octree
         return out;
     }
 
+    std::vector<T> get_all_leaves(octree_node node)
+    {
+        std::vector<T> out;
+        for (auto half1 : node.children) {
+            for (auto half2 : half1) {
+                for (auto half3 : half2) {
+                    if (half3 == -1) {
+                        continue;
+                    }
+                    if (node.children_are_leaves) {
+                        out.insert(out.end(), leaves[half3].begin(), leaves[half3].end());
+                    } else {
+                        std::vector<T> result = get_all_leaves(nodes[half3]);
+                        out.insert(out.end(), result.begin(), result.end());
+                    }
+                }
+            }
+        }
+        return out;
+    }
+
     std::vector<const std::vector<T>*> get_leaf_values(octree_node node)
     {
         std::vector<const std::vector<T>*> out;
@@ -149,9 +170,9 @@ template <typename T> class octree
     }
 
 
+    int max_depth;
     private:
 
-    int max_depth;
     std::vector<octree_node> nodes;
     std::vector<std::vector<T>> leaves;
 };

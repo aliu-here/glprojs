@@ -1,5 +1,4 @@
 #include <glm/glm.hpp>
-#include <iostream>
 
 #ifndef FRUSTUM
 #define FRUSTUM
@@ -24,8 +23,6 @@ struct frustum
     glm::vec4 normalize_vec4(glm::vec4 vec)
     {
         float length = glm::length(glm::vec3(vec.x, vec.y, vec.z));
-//        print_vec3(vec);
-        std::cout << "length: " << length << '\n';
         return vec / length;
     }
 
@@ -50,6 +47,14 @@ struct frustum
         return (plane_eq(left, point) < 0 && plane_eq(right, point) < 0 &&\
                 plane_eq(bottom, point) < 0 && plane_eq(top, point) < 0 && \
                 plane_eq(near, point) < 0 && plane_eq(far, point) < 0);
+    }
+
+    bool check_sphere(glm::vec3 point, float radius)
+    {
+        return (!(plane_eq(left, point) < -radius) && !(plane_eq(right, point) < -radius) &&\
+                !(plane_eq(bottom, point) < -radius) && !(plane_eq(top, point) < -radius) && \
+                !(plane_eq(near, point) < -radius) && !(plane_eq(far, point) < -radius));
+
     }
 
     glm::vec4 left, right, bottom, top, near, far;
