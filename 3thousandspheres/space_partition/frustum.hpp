@@ -1,10 +1,13 @@
 #include <glm/glm.hpp>
 #include <iostream>
 
+#ifndef FRUSTUM
+#define FRUSTUM
+
 struct frustum
 {
 
-    void print_mat(glm::mat4 mat)
+/*    void print_mat(glm::mat4 mat)
     {
         for (int i=0; i<4; i++) {
             for (int j=0; j<4; j++) {
@@ -16,12 +19,12 @@ struct frustum
 
     void print_vec3(glm::vec4 vec) {
         std::cout << "x: " << vec.x << ", y: " << vec.y << ", z: " << vec.z << ", w: "  << vec.w<<"\n";
-    }
+    }*/
 
     glm::vec4 normalize_vec4(glm::vec4 vec)
     {
         float length = glm::length(glm::vec3(vec.x, vec.y, vec.z));
-        print_vec3(vec);
+//        print_vec3(vec);
         std::cout << "length: " << length << '\n';
         return vec / length;
     }
@@ -51,3 +54,5 @@ struct frustum
 
     glm::vec4 left, right, bottom, top, near, far;
 };
+
+#endif

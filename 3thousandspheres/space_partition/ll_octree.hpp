@@ -1,5 +1,6 @@
 #include <vector>
 #include <array>
+#include "2d_array.hpp"
 #include <glm/glm.hpp>
 
 #ifndef OCTREE_HPP
@@ -67,14 +68,14 @@ template <typename T> class octree
 
 
         if (nodes[curr_node].children[x_greater][y_greater][z_greater] == -1) {
-            leaves.push_back(std::vector<T>());
-            nodes[curr_node].children[x_greater][y_greater][z_greater] = leaves.size() - 1;
+            leaves.add_row();
+            nodes[curr_node].children[x_greater][y_greater][z_greater] = leaves.size - 1;
         }
 
-        leaves[nodes[curr_node].children[x_greater][y_greater][z_greater]].push_back(assoc_val);
+        leaves[nodes[curr_node].children[x_greater][y_greater][z_greater]].append(assoc_val);
     }
 
-    void remove_point(glm::vec3 point, T val)
+/*    void remove_point(glm::vec3 point, T val)
     {
         octree_node& curr_node = nodes[0];
 
@@ -99,7 +100,7 @@ template <typename T> class octree
         }
 
         leaves[curr_node.children[x_greater][y_greater][z_greater]].erase(val);
-    }
+    }*/
 
     std::vector<octree_node> get_children_of_node(octree_node node)
     {
@@ -120,10 +121,9 @@ template <typename T> class octree
         return out;
     }
 
-    std::vector<const std::vector<T>*> get_leaf_values(octree_node node)
+    std::vector<T> get_leaf_values(octree_node node)
     {
-        std::vector<const std::vector<T>*> out;
-        out.reserve(8);
+        std::vector<T> out;
 
         if (!node.children_are_leaves)
             return {};
@@ -134,9 +134,11 @@ template <typename T> class octree
                     if (half3 == -1) {
                         continue;
                     }
-                    if (node.children_are_leaves) {
-                        out.push_back(&leaves[half3]);
-                    }
+                    auto i = leaves[half3].begin();
+                    do {
+                        i = leaves[half3].next(i);
+                        out.push_back(i.value);
+                    } while (i != leaves[half3].end());
                 }
             }
         }
@@ -153,7 +155,7 @@ template <typename T> class octree
 
     int max_depth;
     std::vector<octree_node> nodes;
-    std::vector<std::vector<T>> leaves;
+    array_2d<int> leaves;
 };
 
 #endif
