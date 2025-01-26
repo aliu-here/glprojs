@@ -18,7 +18,24 @@ namespace loader {
         glm::vec3 normal = glm::vec3(0.0, 0.0, 0.0);
     };
 
-    struct box { glm::vec3 min = glm::vec3(0, 0, 0), max = glm::vec3(0.0, 0.0, 0.0); };
+    struct box {
+        glm::vec3 min = glm::vec3(0, 0, 0), max = glm::vec3(0.0, 0.0, 0.0);
+
+        std::vector<glm::vec3> get_box_vertices()
+        {
+            std::vector<glm::vec3> out;
+            for (int i=0; i<=1; i++) {
+                for (int j=0; j<= 1; i++) {
+                    for (int k=0; k<=1; k++) {
+                        out.push_back(glm::vec3(i ? min.x : max.x,
+                                                j ? min.y : max.y,
+                                                k ? min.z : max.z));
+                    }
+                }
+            }
+            return out;
+        }
+    };
 
     struct material
     {
