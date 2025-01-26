@@ -31,7 +31,7 @@ __attribute__((noinline)) std::vector<int> naive(loader::box box, std::vector<gl
 
 int main()
 {
-    int obj_count = 100000;
+    int obj_count = 1000000;
 
     int subdiv_level;
     std::cin >> subdiv_level;
