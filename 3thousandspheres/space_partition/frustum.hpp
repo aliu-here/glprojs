@@ -39,7 +39,7 @@ struct frustum
 
     float plane_eq(glm::vec4 plane_vec, glm::vec3 point)
     {
-        return glm::dot(glm::vec3(plane_vec.x, plane_vec.y, plane_vec.z), point) - plane_vec.w;
+        return -glm::dot(glm::vec3(plane_vec.x, plane_vec.y, plane_vec.z), point) - plane_vec.w;
     }
 
     bool check_point(glm::vec3 point) 

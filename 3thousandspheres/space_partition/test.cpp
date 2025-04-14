@@ -30,9 +30,26 @@ __attribute__((noinline)) std::vector<int> naive(loader::box box, std::vector<gl
     return naive_result;
 }
 
+__attribute__((noinline)) std::vector<int> frustum_cull(octree<int> bbox_octree, loader::box box, std::vector<glm::vec3>& positions, frustum f, int subdiv_level, int obj_count)
+{
+    const std::vector<glm::vec3> vertices = box.get_box_vertices();
+    std::vector<int> sure, unsure;
+    std::tie(sure, unsure) = get_object_indices(f, bbox_octree, obj_count, subdiv_level);
+    
+    for (int val : unsure) {
+        for (glm::vec3 vertex : vertices) {
+            if (f.check_point(vertex + positions[val])) {
+                sure.push_back(val);
+                break;
+            }
+        }
+    }
+    return sure;
+}
+
 int main()
 {
-    int obj_count = 5000;
+    int obj_count = 10000;
 
     int subdiv_level;
     std::cin >> subdiv_level;
@@ -64,20 +81,7 @@ int main()
     frustum f(proj_mat);
 
     auto begin = std::chrono::system_clock::now();
-    std::vector<int> sure, unsure;
-    std::tie(sure, unsure) = get_object_indices(f, bbox_octree, obj_count, subdiv_level);
-    int check_count = 0;
-    
-    for (int val : unsure) {
-        for (glm::vec3 vertex : vertices) {
-            check_count++;
-            if (f.check_point(vertex + positions[val])) {
-                sure.push_back(val);
-                break;
-            }
-        }
-    }
-    std::cout << check_count << " checks afterward\n";
+    std::vector<int> sure = frustum_cull(bbox_octree, bbox, positions, f, subdiv_level, obj_count);
     auto end = std::chrono::system_clock::now();
     std::cout << std::chrono::duration_cast<std::chrono::microseconds>(end-begin).count() << "us for octree" << '\n';
 

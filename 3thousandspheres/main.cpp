@@ -5,6 +5,7 @@
 #include <GLFW/glfw3.h>
 //glm
 #include <cmath>
+#include <glm/ext/vector_float3.hpp>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -14,8 +15,10 @@
 
 #include <vector>
 #include <iostream>
+
 #include "shader.h"
 #include "process_input.cpp"
+#include "space_partition/frustum_cull.hpp"
 
 #include "wavefront_loader/loader.hpp"
 
@@ -114,7 +117,6 @@ int main()
     long point_count = 0;
 
     for (loader::mesh part : model) {
-        std::cout << '\n';
         points.insert(points.end(), (float*)&(part.data[0]), (float*)(&(part.data[part.data.size()]))); //ugly but works
         for (auto triangle : part.indices) {
             for (int i=0; i<3; i++) {
@@ -127,16 +129,40 @@ int main()
     std::cout << points.size() << '\n';
     std::cout << indices.size() << '\n';
 
-    std::array<glm::vec3, 5000> positions;
+    int obj_count;
+    std::cin >> obj_count;
+
+    octree<int> bbox_vertices({0, 0, 0}, 1000, 2);
+
+    std::vector<glm::vec3> positions(obj_count, glm::vec4(0, 0, 0, 0));
 
     std::mt19937 engine(0);
     std::uniform_real_distribution dis(-25.0, 25.0);
 
     std::srand(0);
-    for (int i=0; i<5000; i++) {
+
+    for (int i=0; i<obj_count; i++) {
         positions[i] = {dis(engine), dis(engine), dis(engine)};
+        for (glm::vec3 bbox_vertex : model[0].bounding_box.get_box_vertices()) {
+            bbox_vertices.add_point(bbox_vertex + positions[i], i);
+        }
     }
 
+    struct depth_compare
+    {
+        glm::mat4 m_view;
+
+        depth_compare(glm::mat4 view)
+        {
+            m_view = view;
+        }
+
+        bool operator()(glm::vec3& a, glm::vec3& b) const
+        {
+            glm::vec3 atransformed = m_view * glm::vec4(a, 1.0f), btransformed = m_view * glm::vec4(b, 1.0f);
+            return atransformed.z < btransformed.z;
+        }
+    };
 
     unsigned int VBO, VAO;
     glGenVertexArrays(1, &VAO);
@@ -158,6 +184,15 @@ int main()
     glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8*sizeof(float), (void*)(5*sizeof(GLfloat)));
     glEnableVertexAttribArray(2);
 
+    unsigned int instancesVBO;
+    glGenBuffers(1, &instancesVBO);
+
+    glEnableVertexAttribArray(3);
+    glBindBuffer(GL_ARRAY_BUFFER, instancesVBO);
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glVertexAttribDivisor(3, 1);
+		
     std::cout << "glGetError: " << glGetError() << '\n';
 
     //lock cursor to center
@@ -175,16 +210,13 @@ int main()
 
 	glEnable(GL_DEPTH_TEST);
 	glEnable(GL_NORMALIZE); 
-//    glEnable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE);
 
 
     mainShader.use();
 
     float avg_fps = NAN;
-
-    for (int i=0; i<5000; i++) {
-        mainShader.setVec3(("offsets[" + std::to_string(i) + "]"), positions[i]);
-    }
+    int frames_so_far = 0;
 
 	while(!glfwWindowShouldClose(window))
 	{
@@ -192,10 +224,13 @@ int main()
         	deltaTime = currentFrame - lastFrame;
         	lastFrame = currentFrame;
 
-        if (avg_fps != avg_fps)
+        if (avg_fps != avg_fps) {
             avg_fps = 1/deltaTime;
-        else
-            avg_fps = (avg_fps + 1/deltaTime) / 2;
+            frames_so_far++;
+        } else {
+            avg_fps = ((avg_fps)*frames_so_far + 1/deltaTime) / (frames_so_far + 1);
+            frames_so_far++;
+        }
 
 		camera.process_kb_input(window, deltaTime, currentFrame);
 
@@ -207,17 +242,41 @@ int main()
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         // create transformations
-        	glm::mat4 model         = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
+        	glm::mat4 model_mat         = glm::mat4(1.0f); // make sure to initialize matrix to identity matrix first
         	glm::mat4 view          = glm::mat4(1.0f);
         	glm::mat4 projection    = glm::mat4(1.0f);
 
 		view = glm::lookAt(camera.cameraPos, camera.cameraPos + camera.cameraFront, camera.cameraUp);
 		projection = glm::perspective(glm::radians(camera.fov), (float)mode->width/mode->height, 0.1f, 1000.0f);
 
-		
+        frustum clip_frustum(projection * view);
+        std::vector<int> sure, unsure;
+        std::tie(sure, unsure) = get_object_indices(clip_frustum, bbox_vertices, obj_count, 2);
+        for (int val : unsure) {
+            for (glm::vec3 vertex : model[0].bounding_box.get_box_vertices()) {
+                if (clip_frustum.check_point(vertex + positions[val])) {
+                    sure.push_back(val);
+                    break;
+                }
+            }
+        }
+
+        std::vector<glm::vec3> visible_positions;
+        for (int val : sure) {
+            visible_positions.push_back(positions[val]);
+        }
+
+        glBindBuffer(GL_ARRAY_BUFFER, instancesVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * visible_positions.size(), visible_positions.data(), GL_STATIC_DRAW); 
+
+
+//        depth_compare comparator = depth_compare(view);
+//        std::sort(positions.begin(), positions.end(), comparator);
+
+
         // note: currently we set the projection matrix each frame, but since the projection matrix rarely changes it's often best practice to set it outside the main loop only once.
         mainShader.setMat4("projection", projection);
-		mainShader.setMat4("model", model);
+		mainShader.setMat4("model", model_mat);
 		mainShader.setMat4("view", view);
 		mainShader.setFloat("ratio", 1.0f);
 		mainShader.setVec3("lightPos", lightSourceLoc);
@@ -230,7 +289,7 @@ int main()
 		mainShader.setVec3("objectColor", glm::vec3(1.0f, 0.5f, 0.31f));
 		mainShader.setVec3("lightColor", glm::vec3(1.0f, 1.0f, 1.0f));
 		glBindVertexArray(VAO);
-		glDrawElementsInstanced(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0, 5000);
+		glDrawElementsInstanced(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0, visible_positions.size());
         glBindVertexArray(0);
 
 		lightSourceLoc.x += glm::radians(glm::sin(currentFrame)) * 3;
