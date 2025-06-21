@@ -1,3 +1,10 @@
 */build/*
 includes/*
 */*perf*
+!*/*.cpp
+!*/Makefile
+!*/*.vert
+!*/*.glsl
+!*/*.frag
+!*/*.hpp
+!*/*.h
