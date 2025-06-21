@@ -3,7 +3,7 @@ out vec4 FragColor;
 
 //in vec2 TexCoord;
 in vec3 Normal;
-in vec3 FragPos;
+in vec3 pos;
 
 uniform vec3 lightColor;
 uniform vec3 objectColor;
@@ -16,12 +16,12 @@ uniform vec3 viewPos;
 vec3 calcSpecular(float df)
 {
     float specularStrength = 0.5;
-    vec3 viewDir = normalize(viewPos - FragPos);
+    vec3 lightDir = normalize(lightPos - pos);
+    vec3 viewDir = normalize(viewPos - pos);
+    vec3 halfwayDir = normalize(lightDir + viewDir);
 
-    vec3 reflectDir = reflect(-normalize(lightPos - FragPos), normalize(Normal));
-    
     float c = float(df > 0.0) - float(df < 0.0);
-    float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32) * c;
+    float spec = pow(max(dot(Normal, halfwayDir), 0.0), 32) * c;
 
     vec3 specular = specularStrength * spec * lightColor;  
     return specular;
@@ -35,7 +35,7 @@ vec3 phongShading()
   	
     // diffuse 
     vec3 norm = normalize(Normal);
-    vec3 lightDir = normalize(lightPos - FragPos);
+    vec3 lightDir = normalize(lightPos - pos);
     float diff = max(dot(norm, lightDir), 0.0);
     vec3 diffuse = diff * lightColor;
             

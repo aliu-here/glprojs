@@ -25,7 +25,15 @@ enum further_checking_status {
 
 frustum_result frustum_intersects_octree_subdiv_count(octree_node node, frustum frustum)
 {
-    int count = 0;
+    float s = node.side_len / 2;
+    frustum::inside_degrees result = frustum.check_sphere(node.center, s * s * s / 8);
+    if (result == frustum.FULLY_INSIDE)
+        return FULLY_INSIDE;
+    else if (result == frustum.PARTIALLY_INSIDE)
+        return PARTIALLY_INSIDE;
+    return OUTSIDE;
+/*    int count = 0;
+    
     for (int add_x = -1; add_x <= 1; add_x+=2) {
         for (int add_y = -1; add_y <= 1; add_y+=2) {
             for (int add_z = -1; add_z <= 1; add_z+=2) {
@@ -42,7 +50,7 @@ frustum_result frustum_intersects_octree_subdiv_count(octree_node node, frustum 
             }
         }
     }
-    return (count == 0) ? OUTSIDE : FULLY_INSIDE;
+    return (count == 0) ? OUTSIDE : FULLY_INSIDE; */
 }
 
 void traverse_tree(frustum frustum, octree_node root, octree<int>& bbox_octree, std::vector<bool>& poss_included, int max_cull_depth)

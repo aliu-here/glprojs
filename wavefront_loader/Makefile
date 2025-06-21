@@ -1,8 +1,8 @@
 CC = clang++
 INCLUDES = 
 CXX_STD = c++23
-CCFLAGS = -c -O3 #-fno-math-errno -fno-trapping-math
-DEBUGFLAGS = -c -O0 -g -DDEBUG
+CCFLAGS = -c -O3 -Wall -Werror
+DEBUGFLAGS = -g -DDEBUG -fno-omit-frame-pointer
 
 wincc = x86_64-w64-mingw32-g++
 winincludes = -Llibmingw32 -I../includes
@@ -10,12 +10,14 @@ winflags = -static
 
 all: clean string_utils triangulate loader save_load_utils
 	ar rcs libloader.a loader.o string_utils.o triangulate.o
-	rm *.o
 
-debug: CCFLAGS = ${DEBUGFLAGS}
+coverage: CCFLAGS := ${CCFLAGS} ${DEBUGFLAGS} --coverage
+coverage: clean string_utils triangulate loader save_load_utils
+	ar rcs libloader.a loader.o string_utils.o triangulate.o
+
+debug: CCFLAGS := ${CCFLAGS} ${DEBUGFLAGS}
 debug: clean string_utils triangulate loader save_load_utils
-	ar rcs libloaderdebug.a loader.o string_utils.o triangulate.o
-	rm *.o
+	ar rcs libloader.a loader.o string_utils.o triangulate.o
 
 
 all_win: CC = ${wincc}

@@ -5,7 +5,6 @@
 #include <string>
 #include <unordered_map>
 #include <iostream>
-#include <cstring>
 #include <memory>
 
 #include "mesh.hpp"
@@ -54,8 +53,8 @@ namespace loader
         glm::vec3 cross = glm::cross(side_a, side_b);
         if (glm::dot(cross, normal) < 0)
             //weird manual cast
-            return input_winding ? (std::array<unsigned int, 3>){vertices[0], vertices[1], vertices[2]} : (std::array<unsigned int, 3>){vertices[0], vertices[2], vertices[1]};
-        return input_winding ? (std::array<unsigned int, 3>){vertices[0], vertices[2], vertices[1]} : (std::array<unsigned int, 3>){vertices[0], vertices[1], vertices[2]};
+            return input_winding ? std::array<unsigned int, 3>({vertices[0], vertices[1], vertices[2]}) : std::array<unsigned int, 3>({vertices[0], vertices[2], vertices[1]});
+        return input_winding ? std::array<unsigned int, 3>({vertices[0], vertices[2], vertices[1]}) : std::array<unsigned int, 3>({vertices[0], vertices[1], vertices[2]});
     }
 
     glm::vec3 project_in_dir(glm::vec3 vec, int project_dir) 
@@ -78,8 +77,6 @@ namespace loader
         float angle_to_x_axis = cross_prod_norm[0],
               angle_to_y_axis = cross_prod_norm[1],
               angle_to_z_axis = cross_prod_norm[2];
-        float best_angle = 0; // we want to find angle where |angle| is closest to one
-                              // because |cos(0)| and |cos(180)| = 1
         int project_dir = 0;
         if (std::abs(angle_to_x_axis) > project_dir) {
             project_dir = x;
@@ -241,7 +238,6 @@ namespace loader
         std::unique_ptr<std::vector<std::array<unsigned int, 3>>> point_indexes = std::make_unique<std::vector<std::array<unsigned int, 3>>>();
         std::unique_ptr<std::vector<point>> all_points = std::make_unique<std::vector<point>>();
         int points_sofar=0;
-        bool failure = false;
         for (const std::string &line : faces)
         {
             std::vector<point> point_listing;

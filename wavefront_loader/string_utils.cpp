@@ -12,7 +12,6 @@ std::vector<std::string_view> split(const std::string_view s, const std::string_
     std::string_view token;
     std::vector<std::string_view> res;
 
-    int last_pos = 0;
     while ((pos_end = s.find(delimiter, pos_start)) != std::string::npos) {
         token = s.substr (pos_start, pos_end - pos_start);
         pos_start = pos_end + delim_len;
@@ -48,7 +47,7 @@ std::string join(const std::vector<std::string_view>& array, const std::string_v
 {
         std::string output;
         int i=0;
-        for (;i<array.size() - 1; i++)
+        for (;i<(int)(array.size() - 1); i++)
         {
                 output.append(array[i]);
                 output.append(join_string);

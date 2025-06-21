@@ -95,7 +95,7 @@ namespace loader {
     }
 
     inline uint32_t read_uint32(std::ifstream in_file) {
-        char *read_in;
+        char read_in[sizeof(uint32_t)/sizeof(char)];
         in_file.read(read_in, sizeof(uint32_t));
         uint32_t out = *reinterpret_cast<uint32_t*>(read_in);
         return out;

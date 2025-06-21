@@ -8,6 +8,7 @@
 #include <atomic>
 #include <thread>
 #include <memory>
+#include <mutex>
 
 #include "mesh.hpp"
 #include "string_utils.hpp"
@@ -105,25 +106,24 @@ namespace loader
         return materials;
     }
 
-    void triangulate_worker(std::vector<std::string>& assignedfaces, const std::vector<glm::vec3>& verts, const std::vector<glm::vec2>& uvcoords, const std::vector<glm::vec3>& normals, std::vector<std::tuple<std::unique_ptr<std::vector<point>>, std::unique_ptr<std::vector<std::array<unsigned int, 3>>>>>& outvec, std::atomic<bool>& outvec_used, std::atomic<unsigned int>& finished, int id) {
+    void triangulate_worker(std::vector<std::string>& assignedfaces, const std::vector<glm::vec3>& verts, const std::vector<glm::vec2>& uvcoords, const std::vector<glm::vec3>& normals, std::vector<std::tuple<std::unique_ptr<std::vector<point>>, std::unique_ptr<std::vector<std::array<unsigned int, 3>>>>>& outvec, std::atomic<unsigned int>& finished, int id) {
         outvec[id] = process_faces(assignedfaces, verts, uvcoords, normals); //race condition is impossible
         finished.fetch_add(1);
     }
 
     //calls the triangulation functions; packaged into a function for parallelization
-    void threaded_triangulate_boss(mesh group, std::unique_ptr<std::vector<std::string>> allfaces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, std::atomic<unsigned int>& done_flag, std::vector<mesh>& out_groups, std::atomic<bool>& vec_used, int thread_count) {
+    void threaded_triangulate_boss(mesh group, std::unique_ptr<std::vector<std::string>> allfaces, const std::vector<glm::vec3>& coords, const std::vector<glm::vec2>& tex, const std::vector<glm::vec3>& normals, std::atomic<unsigned int>& done_flag, std::vector<mesh>& out_groups, std::mutex& vec_used, int thread_count) {
 
         std::vector<std::tuple<std::unique_ptr<std::vector<point>>, std::unique_ptr<std::vector<std::array<unsigned int, 3>>>>> worker_output(thread_count);
 
         std::atomic<unsigned int> worker_finished = 0;
-        std::atomic<bool> using_outvec = false;
 
         std::vector<std::vector<std::string>> dist_work = std::vector<std::vector<std::string>>(thread_count);
         for (int i=0; i<allfaces->size(); i++) {
             dist_work[i % thread_count].push_back((*allfaces)[i]);
         }
         for (int i=0; i<thread_count; i++) {
-            std::thread worker(triangulate_worker, std::ref(dist_work[i]), std::ref(coords), std::ref(tex), std::ref(normals), std::ref(worker_output), std::ref(using_outvec), std::ref(worker_finished), i);
+            std::thread worker(triangulate_worker, std::ref(dist_work[i]), std::ref(coords), std::ref(tex), std::ref(normals), std::ref(worker_output), std::ref(worker_finished), i);
             worker.detach();
         }
 
@@ -146,16 +146,10 @@ namespace loader
 
         }
 
-        bool target = false;
-
-        while (true) {
-            if (std::atomic_compare_exchange_weak(&vec_used, &target, true)) {
-                out_groups.push_back(group);
-                vec_used.store(false);
-                done_flag.fetch_add(1);
-                break;
-            }
-        }
+        vec_used.lock();
+        out_groups.push_back(group);
+        vec_used.unlock();
+        done_flag.fetch_add(1);
     }
     
     //if it fails it returns an empty vector
@@ -165,7 +159,7 @@ namespace loader
         using namespace std::chrono_literals;
         std::cout << "loader::loader called\n";
 
-        std::atomic<bool> used = false;
+        std::mutex used;
         std::atomic<unsigned int> finished = 0;
 
         std::ifstream obj_file(path);
@@ -184,18 +178,22 @@ namespace loader
         mesh curr_group;
 
         std::string line="";
-        int line_num = 0, face_count = 0, line_num_for_triangulate = 0, ocount = 0;
+        int line_num = 0, face_count = 0, ocount = 0;
         mesh empty_mesh;
-        int vert_count=0;
         while (getline(obj_file, line))
         {
             float arg1=FLT_INF, arg2=FLT_INF, arg3=FLT_INF;
             std::string_view str_arg1, str_arg2, str_arg3, line_type;
             std::vector<std::string_view> split_line = split(line, " ");
-            str_arg1 = split_line[1];
-            str_arg2 = split_line[2];
-            str_arg3 = split_line[3];
+
+
             line_type = split_line[0];
+            if (split_line.size() > 1)
+                str_arg1 = split_line[1];
+            if (split_line.size() > 2)
+                str_arg2 = split_line[2];
+            if (split_line.size() > 3)
+                str_arg3 = split_line[3];
 
             line_num++;
             if (line_type == "v") { //vertex
@@ -214,7 +212,6 @@ namespace loader
 
                 vert_data.push_back(glm::vec3(arg1, arg2, arg3));
                 int v_last_idx = vert_data.size() - 1;
-                vert_count++;
                 for (int i=0; i<3; i++)
                 {
                     curr_group.bounding_box.min[i] = std::min(curr_group.bounding_box.min[i], vert_data[v_last_idx][i]);

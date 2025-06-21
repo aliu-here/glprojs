@@ -49,12 +49,23 @@ struct frustum
                 plane_eq(near, point) < 0 && plane_eq(far, point) < 0);
     }
 
-    bool check_sphere(glm::vec3 point, float radius)
+    enum inside_degrees {
+        FULLY_INSIDE,
+        PARTIALLY_INSIDE,
+        OUTSIDE
+    };
+    inside_degrees check_sphere(glm::vec3 point, float radius)
     {
-        return (!(plane_eq(left, point) < -radius) && !(plane_eq(right, point) < -radius) &&\
-                !(plane_eq(bottom, point) < -radius) && !(plane_eq(top, point) < -radius) && \
-                !(plane_eq(near, point) < -radius) && !(plane_eq(far, point) < -radius));
-
+        float l = plane_eq(left, point), r = plane_eq(right, point), \
+              b = plane_eq(bottom, point), t = plane_eq(top, point), \
+              n = plane_eq(near, point), f = plane_eq(far, point);
+        if (l < -radius && r < -radius && b < -radius && t < -radius && n < -radius && f < -radius) {
+            return FULLY_INSIDE;
+        } else if (l < radius && r < radius && b < radius && t < radius && n < radius && f < radius) {
+            return PARTIALLY_INSIDE;
+        } else {
+            return OUTSIDE;
+        }
     }
 
     glm::vec4 left, right, bottom, top, near, far;

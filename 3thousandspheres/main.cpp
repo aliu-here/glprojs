@@ -104,7 +104,7 @@ int main()
 	glViewport(0, 0, mode->width, mode->height);
 
     auto start = std::chrono::system_clock::now();
-    std::vector<loader::mesh> model = loader::loader("/home/aliu/concave/sphere.obj");
+    std::vector<loader::mesh> model = loader::loader("/home/aliu/mumkey/mumkey.obj");
     auto end = std::chrono::system_clock::now();
     auto microsecs = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
 
@@ -129,10 +129,10 @@ int main()
     std::cout << points.size() << '\n';
     std::cout << indices.size() << '\n';
 
-    int obj_count;
-    std::cin >> obj_count;
+    int obj_count = 10000;
+//    std::cin >> obj_count;
 
-    octree<int> bbox_vertices({0, 0, 0}, 1000, 2);
+    octree<int> bbox_vertices({0, 0, 0}, 1000, 1);
 
     std::vector<glm::vec3> positions(obj_count, glm::vec4(0, 0, 0, 0));
 
@@ -147,7 +147,7 @@ int main()
             bbox_vertices.add_point(bbox_vertex + positions[i], i);
         }
     }
-
+/*
     struct depth_compare
     {
         glm::mat4 m_view;
@@ -163,6 +163,7 @@ int main()
             return atransformed.z < btransformed.z;
         }
     };
+    */
 
     unsigned int VBO, VAO;
     glGenVertexArrays(1, &VAO);
@@ -187,11 +188,26 @@ int main()
     unsigned int instancesVBO;
     glGenBuffers(1, &instancesVBO);
 
-    glEnableVertexAttribArray(3);
+    std::size_t vec4Size = sizeof(glm::vec4);
     glBindBuffer(GL_ARRAY_BUFFER, instancesVBO);
-    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*) 0);
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)0);
+    glEnableVertexAttribArray(3); 
+    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)0);
+    glEnableVertexAttribArray(4); 
+    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)0);
+    glEnableVertexAttribArray(5); 
+    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, 4 * vec4Size, (void*)0);
+    glEnableVertexAttribArray(6); 
+
+
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+
     glVertexAttribDivisor(3, 1);
+    glVertexAttribDivisor(4, 1);
+    glVertexAttribDivisor(5, 1);
+    glVertexAttribDivisor(6, 1);
+
+    glBindVertexArray(0);
 		
     std::cout << "glGetError: " << glGetError() << '\n';
 
@@ -251,23 +267,20 @@ int main()
 
         frustum clip_frustum(projection * view);
         std::vector<int> sure, unsure;
-        std::tie(sure, unsure) = get_object_indices(clip_frustum, bbox_vertices, obj_count, 2);
+        std::tie(sure, unsure) = get_object_indices(clip_frustum, bbox_vertices, obj_count, 1);
         for (int val : unsure) {
-            for (glm::vec3 vertex : model[0].bounding_box.get_box_vertices()) {
-                if (clip_frustum.check_point(vertex + positions[val])) {
-                    sure.push_back(val);
-                    break;
-                }
-            }
+            int result = clip_frustum.check_sphere(positions[val], glm::length(model[0].bounding_box.max - (model[0].bounding_box.max + model[0].bounding_box.min)*0.5f));
+            if (result == 0 || result == 1)
+                sure.push_back(val);
         }
 
-        std::vector<glm::vec3> visible_positions;
+        std::vector<glm::mat4> visible_positions;
         for (int val : sure) {
-            visible_positions.push_back(positions[val]);
+            visible_positions.push_back(glm::inverse(glm::lookAt(positions[val], camera.cameraPos, camera.cameraUp)));
         }
 
         glBindBuffer(GL_ARRAY_BUFFER, instancesVBO);
-        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::vec3) * visible_positions.size(), visible_positions.data(), GL_STATIC_DRAW); 
+        glBufferData(GL_ARRAY_BUFFER, sizeof(glm::mat4) * visible_positions.size(), visible_positions.data(), GL_STATIC_DRAW); 
 
 
 //        depth_compare comparator = depth_compare(view);
@@ -279,7 +292,7 @@ int main()
 		mainShader.setMat4("model", model_mat);
 		mainShader.setMat4("view", view);
 		mainShader.setFloat("ratio", 1.0f);
-		mainShader.setVec3("lightPos", lightSourceLoc);
+		mainShader.setVec3("lightPos", camera.cameraPos);
 		mainShader.setVec3("lightDir", camera.cameraPos);
 
 
@@ -291,10 +304,6 @@ int main()
 		glBindVertexArray(VAO);
 		glDrawElementsInstanced(GL_TRIANGLES, indices.size(), GL_UNSIGNED_INT, 0, visible_positions.size());
         glBindVertexArray(0);
-
-		lightSourceLoc.x += glm::radians(glm::sin(currentFrame)) * 3;
-		lightSourceLoc.y += glm::radians(glm::cos(currentFrame)) * 3;
-		lightSourceLoc.z += glm::radians(glm::sin(glm::cos(currentFrame))) * 3;
 //		camera.cameraPos = lightSourceLoc;
 
 		glfwSwapBuffers(window);
@@ -303,6 +312,7 @@ int main()
 
     std::cout << "average fps: " << avg_fps << '\n';
 
+    glfwDestroyWindow(window);
 	glfwTerminate();
 	return 0;
 }
